@@ -1,0 +1,76 @@
+name: Desktop release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: read
+
+env:
+  DSH_DESKTOP_APP_ID: com.deepseek.harness.desktop
+  DSH_DESKTOP_UNSIGNED: '1'
+
+jobs:
+  package-macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.17.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run generate:desktop-icons
+      - run: pnpm run package:desktop:mac:arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-arm64
+          path: apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*
+          if-no-files-found: error
+
+  package-windows-x64:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.17.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run generate:desktop-icons
+      - run: pnpm run package:desktop:win:x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: apps/desktop/.desktop-build/targets/win-x64/artifacts/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: [package-macos-arm64, package-windows-x64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: Create GitHub Release and upload installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
+          find release-artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \) -print0 \
+            | xargs -0 gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
