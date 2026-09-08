@@ -16,6 +16,8 @@ The application icon is generated from `apps/desktop/build/icon.svg`, which cont
 
 GitHub Actions builds unsigned macOS arm64 and Windows x64 artifacts on native runners. A manual run or `desktop-v*` tag creates a GitHub Release and uploads the installers. The workflow never receives signing credentials, and the signed path remains the default when the flag is absent.
 
+The Windows runtime preparation extracts the pinned Node.js ZIP with the runner's `tar` implementation. This avoids a pending archive read stream observed in native Windows CI while preserving the same checksum and executable verification steps.
+
 ## Alternatives considered
 
 **Wait for release certificates.** This prevents local GUI testing and delays cross-platform packaging validation. The explicit test mode keeps the credentialed path unchanged while making the missing trust chain visible to users.

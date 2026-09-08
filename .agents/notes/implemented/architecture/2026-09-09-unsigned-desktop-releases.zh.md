@@ -16,6 +16,8 @@ Electron builder 接受 `DSH_DESKTOP_UNSIGNED=1` 作为显式测试模式。macO
 
 GitHub Actions 在原生 runner 上构建未签名的 macOS arm64 与 Windows x64 产物。手动运行或推送 `desktop-v*` tag 会创建 GitHub Release 并上传安装包。workflow 不接收签名凭据；没有该标志时仍使用签名流程。
 
+Windows 运行时准备使用 runner 自带的 `tar` 解压固定版本的 Node.js ZIP。这样可以避免原生 Windows CI 中观察到的归档读取流悬挂，同时保留相同的校验和与可执行文件验证步骤。
+
 ## 考虑过的替代方案
 
 **等待发布证书。** 这会阻止本机 GUI 测试并延迟跨平台打包验证。显式测试模式保持凭据流程不变，同时让用户看到缺少信任链的事实。

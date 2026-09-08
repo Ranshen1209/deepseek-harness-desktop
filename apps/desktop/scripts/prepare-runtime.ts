@@ -7,7 +7,6 @@ import { chmod, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
-import extractZip from 'extract-zip'
 import { extract } from 'tar'
 import { resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 
@@ -55,8 +54,15 @@ async function prepareNode(platform: RuntimePlatform, arch: RuntimeArch): Promis
   const extraction = BUILD_PATHS.nodeExtract
   rmSync(extraction, { recursive: true, force: true })
   mkdirSync(extraction, { recursive: true })
-  if (platform === 'win') await extractZip(archive, { dir: extraction })
-  else await extract({ cwd: extraction, file: archive })
+  if (platform === 'win') {
+    // Windows runners provide bsdtar, whose ZIP extraction does not leave yauzl
+    // read streams pending when the archive contains executable files.
+    const result = spawnSync('tar', ['-xf', archive, '-C', extraction], { encoding: 'utf8' })
+    if (result.error !== undefined || result.status !== 0) {
+      const detail = result.error?.message ?? result.stderr.trim()
+      throw new Error(`desktop runtime: failed to extract ${archiveName} with tar: ${detail}`)
+    }
+  } else await extract({ cwd: extraction, file: archive })
   const source = join(extraction, folder, platform === 'win' ? 'node.exe' : 'bin/node')
   const destinationRoot = join(RUNTIME_ROOT, 'node')
   const destination = join(destinationRoot, platform === 'win' ? 'node.exe' : 'node')
