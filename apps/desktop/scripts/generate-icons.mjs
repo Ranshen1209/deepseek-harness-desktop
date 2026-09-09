@@ -11,11 +11,19 @@ async function renderSource() {
   return sharp(readFileSync(SOURCE), { density: 144 }).resize(1024, 1024).png().toBuffer()
 }
 
+async function renderWindowsSource(source) {
+  const background = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" rx="220" fill="#fff"/></svg>',
+  )
+  return sharp(background).composite([{ input: source }]).png().toBuffer()
+}
+
 async function main() {
   mkdirSync(OUTPUT, { recursive: true })
   const source = await renderSource()
+  const windowsSource = await renderWindowsSource(source)
   const icns = png2icons.createICNS(source, png2icons.BICUBIC, 0)
-  const ico = png2icons.createICO(source, png2icons.BICUBIC, 0, false, true)
+  const ico = png2icons.createICO(windowsSource, png2icons.BICUBIC, 0, false, true)
   if (icns === null || ico === null) throw new Error('desktop icons: failed to encode ICNS or ICO')
   writeFileSync(join(OUTPUT, 'icon.png'), source)
   writeFileSync(join(OUTPUT, 'icon.icns'), icns)
