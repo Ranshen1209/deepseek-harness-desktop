@@ -17,6 +17,7 @@ import { DesktopProjectManager, type DesktopProjectHooks } from './project-manag
 import { DesktopHostProcess } from './host-process.ts'
 import { DESKTOP_IPC, type DesktopUpdateState } from './ipc.ts'
 import { formatDesktopMessage, resolveDesktopLocale } from './locale.ts'
+import { createDesktopMenuTemplate } from './menu.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
 import { DesktopUpdateCoordinator } from './update-coordinator.ts'
 
@@ -325,20 +326,14 @@ async function main(): Promise<void> {
     void pluginWindow.loadURL(`${SCHEME}://shell/plugin-manager.html`)
   }
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate([{
-    label: process.platform === 'darwin' ? app.name : messages.application,
-    submenu: [
-      {
-        label: development === undefined ? messages.pluginsMenu : messages.pluginsMenuPackagedOnly,
-        accelerator: 'CmdOrCtrl+,',
-        enabled: development === undefined,
-        click: openPluginWindow,
-      },
-      { label: messages.checkUpdatesMenu, click: () => { void checkAndPrompt(true) } },
-      { type: 'separator' },
-      { role: 'quit' },
-    ],
-  }]))
+  Menu.setApplicationMenu(Menu.buildFromTemplate(createDesktopMenuTemplate({
+    platform: process.platform,
+    applicationName: app.name,
+    messages,
+    pluginsEnabled: development === undefined,
+    openPlugins: openPluginWindow,
+    checkUpdates: () => { void checkAndPrompt(true) },
+  })))
 
   const createMainWindow = (): BrowserWindow => {
     const window = createWindow(appPreload)

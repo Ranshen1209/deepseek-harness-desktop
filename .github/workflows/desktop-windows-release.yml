@@ -26,6 +26,7 @@ jobs:
           node-version: 24.17.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
       - run: pnpm run generate:desktop-icons
       - run: pnpm run package:desktop:win:x64
       - uses: actions/upload-artifact@v4

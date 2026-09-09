@@ -34,7 +34,7 @@ Electron 拥有保留 profile `.dsh/profiles/desktop`。其中精确的 `@deepse
 | 共享 `.dsh` owner | 会话、设置、凭据、工作区和存储，由其现有锁与格式版本保护 |
 | 通过 npm 安装的 dsh | 自己的可执行安装和用户管理的 profile；不能访问保留 desktop profile 或包状态 |
 
-渲染进程使用 `nodeIntegration: false`、`contextIsolation: true` 和 `sandbox: true`。Preload 暴露类型化 RPC、生命周期、更新、locale 与桌面插件操作，而不暴露原始 `ipcRenderer`、文件系统访问、shell 命令或 pnpm 参数。Electron 根据应用 locale 选择类型化的中英文字典，并以英文作为 fallback；菜单、原生对话框与插件管理渲染进程使用这些由 locale 持有的文案。
+渲染进程使用 `nodeIntegration: false`、`contextIsolation: true` 和 `sandbox: true`。Preload 暴露类型化 RPC、生命周期、更新、locale 与桌面插件操作，而不暴露原始 `ipcRenderer`、文件系统访问、shell 命令或 pnpm 参数。Electron 根据应用 locale 选择类型化的中英文字典，并以英文作为 fallback；菜单、原生对话框与插件管理渲染进程使用这些由 locale 持有的文案。Windows 菜单命令只有在执行前需要用户补充信息时才使用省略号，退出命令保留 Electron 原生 quit role，同时使用 locale 持有的标签。
 
 ## 文件系统布局
 

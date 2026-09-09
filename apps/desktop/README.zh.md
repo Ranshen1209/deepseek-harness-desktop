@@ -25,7 +25,7 @@ Electron 拥有保留 profile `$DSH_HOME/profiles/desktop`。其 manifest 通过
 
 dsh 主渲染进程只获得桌面协议标记。独立插件窗口获得结构化的列出、安装、移除、更新和更新检查操作；两个渲染进程都拿不到文件系统、原始 Electron IPC、shell 或任意 pnpm 参数。
 
-Electron 根据应用 locale 选择类型化的中英文字典，并以英文作为 fallback。菜单、原生对话框与插件管理渲染进程使用同一 locale 数据；仓库的 Client UI i18n gate 会检查这些桌面源文件。
+Electron 根据应用 locale 选择类型化的中英文字典，并以英文作为 fallback。菜单、原生对话框与插件管理渲染进程使用同一 locale 数据；Windows 菜单命令只有在执行前需要用户补充信息时才使用省略号；仓库的 Client UI i18n gate 会检查这些桌面源文件。
 
 ### Seed 安装
 
@@ -174,7 +174,7 @@ pnpm run prepare:desktop
 
 ## 更新
 
-打包应用会在主窗口打开十秒后检查目标专用的发布流；本地化的 **检查更新…** 菜单项会手动触发同一检查。发现可用版本时，应用打开一个原生确认弹窗。用户确认后，应用等待正在进行的检查完成，下载并验证已签名的 Desktop 发布、停止 dsh 子进程，并把安装与重启交给 electron-updater。下次启动会先校准版本绑定的 seed，再重新打开产品窗口。
+打包应用会在主窗口打开十秒后检查目标专用的发布流；本地化的 **检查更新** 菜单项会手动触发同一检查。发现可用版本时，应用打开一个原生确认弹窗。用户确认后，应用等待正在进行的检查完成，下载并验证已签名的 Desktop 发布、停止 dsh 子进程，并把安装与重启交给 electron-updater。下次启动会先校准版本绑定的 seed，再重新打开产品窗口。
 
 Electron-builder 始终为 `DSH_DESKTOP_AUTO_UPDATE_ENV` 选择的部署生成 generic-provider 频道元数据。NSIS 差分包与 macOS ZIP 目标让 electron-updater 可以复用未变化的数据块；供手动安装的 DMG 经过公证，但不生成 blockmap，因为它不是 macOS updater 的载荷。Seed 与桌面壳仍属于同一个签名 Desktop 发布。macOS 签名与公证凭据使用 electron-builder 的标准环境变量；Windows EV 签名使用上文所述的公开证书、已验证 SignTool、SafeNet 容器和 runner PIN。必填 Desktop 发布环境选择构建所验证的应用身份与平台签名身份。
 

@@ -1,0 +1,22 @@
+[
+  {
+    "label": "Application",
+    "submenu": [
+      {
+        "label": "Manage Desktop Plugins",
+        "accelerator": "CmdOrCtrl+,",
+        "enabled": true
+      },
+      {
+        "label": "Check for Updates"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "role": "quit",
+        "label": "Exit"
+      }
+    ]
+  }
+]

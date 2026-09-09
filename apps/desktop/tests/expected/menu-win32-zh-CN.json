@@ -1,0 +1,22 @@
+[
+  {
+    "label": "应用",
+    "submenu": [
+      {
+        "label": "桌面插件管理",
+        "accelerator": "CmdOrCtrl+,",
+        "enabled": true
+      },
+      {
+        "label": "检查更新"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "role": "quit",
+        "label": "退出"
+      }
+    ]
+  }
+]
