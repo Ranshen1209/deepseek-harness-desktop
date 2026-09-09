@@ -14,7 +14,7 @@ Electron builder 接受 `DSH_DESKTOP_UNSIGNED=1` 作为显式测试模式。macO
 
 应用图标从 `apps/desktop/build/icon.svg` 生成，该文件把用户提供的 DeepSeek 标志放在白色圆角背景上。图标生成器渲染一张 1024×1024 PNG，并使用 `png2icons` 生成 macOS ICNS 与 Windows ICO 资源。Electron-builder 显式选择各平台资源，Linux 使用 PNG 源文件。
 
-生成 Windows ICO 时会额外使用铺满画布的白色圆角底板。源图稿仍保留 Apple 风格的内缩，而 Windows 资源避免被系统再次按透明留白缩小可见图标。
+生成 Windows ICO 时会额外使用铺满画布的白色圆角底板，并让用户提供的标志占据约 70% 的画布宽度。源图稿仍保留 Apple 风格的内缩，而 Windows 资源会移除透明边距，让图标在系统图标尺寸下保持清晰可读。
 
 GitHub Actions 在原生 runner 上构建未签名的 macOS arm64 与 Windows x64 产物。手动运行或推送 `desktop-v*` tag 会创建 GitHub Release 并上传安装包。workflow 不接收签名凭据；没有该标志时仍使用签名流程。
 

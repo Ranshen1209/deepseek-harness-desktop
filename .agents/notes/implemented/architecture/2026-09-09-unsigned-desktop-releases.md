@@ -14,7 +14,7 @@ The Electron builder accepts `DSH_DESKTOP_UNSIGNED=1` as an explicit test mode. 
 
 The application icon is generated from `apps/desktop/build/icon.svg`, which contains the supplied DeepSeek mark on a white rounded background. The icon generator renders one 1024×1024 PNG and uses `png2icons` to produce the macOS ICNS and Windows ICO resources. Electron-builder selects the platform resource explicitly, while Linux uses the PNG source.
 
-The Windows ICO receives a full-bleed rounded white backing during generation. The source artwork keeps its Apple-style inset, while the Windows resource avoids a second shell scaling pass shrinking the visible icon.
+The Windows ICO receives a full-bleed rounded white backing during generation and reuses the supplied mark at about 70% of the canvas width. The source artwork keeps its Apple-style inset, while the Windows resource avoids transparent margins and preserves a readable foreground at shell icon sizes.
 
 GitHub Actions builds unsigned macOS arm64 and Windows x64 artifacts on native runners. A manual run or `desktop-v*` tag creates a GitHub Release and uploads the installers. The workflow never receives signing credentials, and the signed path remains the default when the flag is absent.
 
