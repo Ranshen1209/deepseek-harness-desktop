@@ -131,11 +131,21 @@ The macOS configuration uses the required release environment instead of accepti
 
 Set `DSH_DESKTOP_UNSIGNED=1` to package a local test build without Developer ID, notarization, or Windows token credentials. The build uses an ad-hoc macOS signature, produces an unsigned Windows NSIS installer, disables update metadata, and does not write an upload completion record.
 
-The repository workflow `Desktop release` builds these packages for macOS arm64 and Windows x64. Manual runs retain build artifacts; a `desktop-v<version>` tag publishes a normal GitHub Release after both builds pass. The complete tag version must match the root, CLI, Desktop, and Desktop Host manifests. Native runners check the prepared seed and installer filenames before upload. The `Desktop macOS release` workflow accepts `desktop-macos-v<version>` tags, checks the ZIP application version, and publishes only macOS arm64 DMG and ZIP downloads. Releases include `SHA256SUMS.txt`; installers retain the complete upstream version, including any `alpha` or `rc` suffix. GitHub release status does not imply code signing or upstream stability; Gatekeeper and SmartScreen can warn about these packages.
+The repository workflow `Desktop release` builds these packages for macOS arm64 and Windows x64. Manual runs retain build artifacts; a `desktop-v<version>` tag publishes a GitHub Release after both builds pass. The complete tag version must match the root, CLI, Desktop, and Desktop Host manifests. Native runners check the prepared seed and installer filenames before upload. The publisher uploads only `deepseek-harness-*.{dmg,zip,exe}` installers and reuses an existing Release on retry. The `Desktop macOS release` workflow accepts `desktop-macos-v<version>` tags, checks the ZIP application version, and publishes only macOS arm64 DMG and ZIP downloads with `SHA256SUMS.txt`. Installers retain the complete upstream version, including any `alpha` or `rc` suffix. GitHub release status does not imply code signing or upstream stability; Gatekeeper and SmartScreen can warn about these packages.
 
 The source icon is `build/icon.svg`. `generate:desktop-icons` renders the 1024×1024 artwork and writes `icon.icns`, `icon.ico`, and `icon.png` from the same source.
 
 Apple’s [App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons) guidance specifies a 1024×1024 square layout for macOS, keeps primary content centered, and lets the system apply the final rounded-rectangle mask. The artwork uses a white rounded background layer and the supplied DeepSeek blue mark, with no custom shadow or highlight.
+
+### Automated upstream sync
+
+The `Upstream desktop sync` workflow polls `deepseek-ai/deepseek-harness` for new `dsh-v*` tags every six hours. You can also run it by hand and pass an explicit tag.
+
+A clean import fast-forwards the default branch and pushes `desktop-v{same-semver-suffix}` so `Desktop release` builds the unsigned macOS arm64 and Windows x64 installers. After that tag push, the sync job dispatches `Desktop release` on the tag if GitHub did not already start it from the push. A conflicted or AI-resolved import never pushes that tag and never dispatches packaging. It opens a draft pull request; after you merge it, push the `desktop-v*` tag yourself to cut the GitHub Release.
+
+Store `DESKTOP_SYNC_TOKEN` or `GH_PAT` (contents, pull requests, workflow, and actions scopes) so the tag push can start `Desktop release` immediately. `GITHUB_TOKEN` can still push the sync commit and open the pull request; the dispatch fallback then starts packaging. Optional `ANTHROPIC_API_KEY` (preferred) or `OPENAI_API_KEY` asks a model to edit remaining conflicted files before the pull request opens.
+
+The [upstream desktop sync Agent Note](../../.agents/notes/implemented/process/2026-09-10-upstream-desktop-sync.md) owns the merge-base, overlay allowlist, and skip rules.
 
 ### Windows EV signing
 

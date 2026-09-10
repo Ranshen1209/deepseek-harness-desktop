@@ -44,17 +44,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.17.0
       - name: Create GitHub Release and upload Windows installer
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --prerelease
-          find release-artifacts -type f -name 'deepseek-harness-*.exe' -print0 \
-            | xargs -0 gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
+        run: node --experimental-strip-types scripts/upload-desktop-github-release.ts --require win --prerelease

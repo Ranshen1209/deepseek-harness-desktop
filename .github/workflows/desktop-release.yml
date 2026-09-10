@@ -75,27 +75,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.17.0
       - name: Create GitHub Release and upload installers
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.version.outputs.version }}
-        run: |
-          mkdir installers
-          for suffix in mac-arm64.dmg mac-arm64.zip win-x64.exe; do
-            filename="deepseek-harness-$RELEASE_VERSION-$suffix"
-            artifact=$(find release-artifacts -type f -name "$filename")
-            test -n "$artifact"
-            cp "$artifact" "installers/$filename"
-          done
-          (cd installers && sha256sum deepseek-harness-* > SHA256SUMS.txt)
-          gh release create "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "DeepSeek Harness Desktop $RELEASE_VERSION" \
-            --draft \
-            --notes "Desktop application and bundled dsh: $RELEASE_VERSION. macOS arm64 and Windows x64. Packages are unsigned and not notarized."
-          gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY"
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest
+        run: node --experimental-strip-types scripts/upload-desktop-github-release.ts --require mac-win

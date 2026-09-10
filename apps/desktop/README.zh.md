@@ -131,11 +131,21 @@ macOS 配置使用必填发布环境，不会接受钥匙串中最先发现的�
 
 设置 `DSH_DESKTOP_UNSIGNED=1` 可以在没有 Developer ID、公证凭据或 Windows Token 的情况下生成本机测试包。该模式使用 macOS ad-hoc 签名，生成未签名的 Windows NSIS 安装器，关闭更新元数据，并且不会写入上传完成记录。
 
-仓库中的 `Desktop release` workflow 会构建 macOS arm64 与 Windows x64 包。手动运行会保留构建产物；推送 `desktop-v<version>` tag 会在两个平台构建通过后发布普通 GitHub Release。tag 的完整版本必须与根目录、CLI、Desktop 和 Desktop Host 的清单一致。原生 runner 会在上传前核对准备好的 seed 和安装包文件名。`Desktop macOS release` workflow 接受 `desktop-macos-v<version>` tag，检查 ZIP 中的应用版本，并且只发布 macOS arm64 的 DMG 和 ZIP 下载。Release 包含 `SHA256SUMS.txt`；安装包保留完整上游版本，包括任何 `alpha` 或 `rc` 后缀。GitHub Release 状态不代表代码已签名或上游版本已稳定；Gatekeeper 和 SmartScreen 仍可能对这些包发出提示。
+仓库中的 `Desktop release` workflow 会构建 macOS arm64 与 Windows x64 包。手动运行会保留构建产物；推送 `desktop-v<version>` tag 会在两个平台构建通过后发布 GitHub Release。tag 的完整版本必须与根目录、CLI、Desktop 和 Desktop Host 的清单一致。原生 runner 会在上传前核对准备好的 seed 和安装包文件名。发布脚本只上传 `deepseek-harness-*.{dmg,zip,exe}` 安装包，并在重试时复用已有 Release。`Desktop macOS release` workflow 接受 `desktop-macos-v<version>` tag，检查 ZIP 中的应用版本，并且只发布带 `SHA256SUMS.txt` 的 macOS arm64 DMG 和 ZIP 下载。安装包保留完整上游版本，包括任何 `alpha` 或 `rc` 后缀。GitHub Release 状态不代表代码已签名或上游版本已稳定；Gatekeeper 和 SmartScreen 仍可能对这些包发出提示。
 
 源图标位于 `build/icon.svg`。`generate:desktop-icons` 从同一份源文件渲染 1024×1024 图稿，并生成 `icon.icns`、`icon.ico` 与 `icon.png`。
 
 Apple 的[App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons)规范要求 macOS 使用 1024×1024 方形布局、保持主体居中，并由系统应用最终的圆角矩形蒙版。图稿使用白色圆角背景和用户提供的 DeepSeek 蓝色标志，不加入自定义阴影或高光。
+
+### 自动上游同步
+
+`Upstream desktop sync` workflow 每六小时向 `deepseek-ai/deepseek-harness` 查询新的 `dsh-v*` tag。也可以手工运行并传入明确的 tag。
+
+干净导入会快进默认分支并推送 `desktop-v{same-semver-suffix}`，以便 `Desktop release` 构建未签名的 macOS arm64 与 Windows x64 安装包。推送该 tag 之后，若 GitHub 尚未因这次推送启动打包，同步任务会在该 tag 上派发 `Desktop release`。有冲突或经 AI 处理的导入绝不推送该 tag，也不派发打包。它会打开 draft pull request；你合并之后，自行推送 `desktop-v*` tag 才能切出 GitHub Release。
+
+请保存具有 contents、pull requests、workflow 与 actions 权限的 `DESKTOP_SYNC_TOKEN` 或 `GH_PAT`，以便 tag 推送立即启动 `Desktop release`。`GITHUB_TOKEN` 仍可推送同步提交并打开 pull request；随后由派发回退启动打包。可选的 `ANTHROPIC_API_KEY`（优先）或 `OPENAI_API_KEY` 会在打开 pull request 之前让模型编辑剩余冲突文件。
+
+[上游 Desktop 同步 Agent Note](../../.agents/notes/implemented/process/2026-09-10-upstream-desktop-sync.zh.md) 负责 merge-base、overlay 允许列表和跳过规则。
 
 ### Windows EV 签名
 
