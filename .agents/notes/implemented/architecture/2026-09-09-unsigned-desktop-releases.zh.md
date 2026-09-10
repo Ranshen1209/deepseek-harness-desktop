@@ -16,7 +16,7 @@ Electron builder 接受 `DSH_DESKTOP_UNSIGNED=1` 作为显式测试模式。macO
 
 生成 Windows ICO 时会额外使用铺满画布的白色圆角底板，并让用户提供的标志占据约 70% 的画布宽度。源图稿仍保留 Apple 风格的内缩，而 Windows 资源会移除透明边距，让图标在系统图标尺寸下保持清晰可读。
 
-GitHub Actions 在原生 runner 上构建未签名的 macOS arm64 与 Windows x64 产物。手动运行或推送 `desktop-v*` tag 会创建 GitHub Release 并上传安装包。workflow 不接收签名凭据；没有该标志时仍使用签名流程。
+GitHub Actions 在原生 runner 上构建未签名的 macOS arm64 与 Windows x64 产物。手动运行或推送 `desktop-v*` tag 会创建 GitHub Release 并上传安装包。[上游 Desktop 同步](../process/2026-09-10-upstream-desktop-sync.zh.md) workflow 可以在干净导入上游 `dsh-v*` 发布后推送该 tag；有冲突的导入改为打开 pull request。workflow 不接收签名凭据；没有该标志时仍使用签名流程。
 
 Windows 运行时准备使用 runner 自带的 `tar` 解压固定版本的 Node.js ZIP。这样可以避免原生 Windows CI 中观察到的归档读取流悬挂，同时保留相同的校验和与可执行文件验证步骤。
 

@@ -1,0 +1,52 @@
+# Poll deepseek-ai/deepseek-harness for new dsh-v* tags and import them into
+# this desktop copy. A clean import fast-forwards the default branch and pushes
+# desktop-v{same-semver-suffix} so desktop-release.yml packages Electron.
+# A conflicted or AI-resolved import opens a draft pull request and never tags.
+#
+# GITHUB_TOKEN can push the sync branch and open the pull request, but GitHub
+# does not start other workflows from a GITHUB_TOKEN tag push. Set
+# DESKTOP_SYNC_TOKEN (or GH_PAT) to a PAT with contents, pull requests, and
+# workflow scopes so a clean desktop-v* tag runs Desktop release.
+name: Upstream desktop sync
+
+on:
+  schedule:
+    # Every six hours, offset from the hour to avoid the top-of-hour stampede.
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: 'Upstream dsh-v* tag to import (empty = newest)'
+        required: false
+        type: string
+
+concurrency:
+  group: upstream-desktop-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Import upstream dsh-v* tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.DESKTOP_SYNC_TOKEN || secrets.GH_PAT || github.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.17.0
+
+      - name: Import upstream and tag or open a review pull request
+        env:
+          GH_TOKEN: ${{ secrets.DESKTOP_SYNC_TOKEN || secrets.GH_PAT || github.token }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DSH_DESKTOP_SYNC_UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+          DSH_DESKTOP_SYNC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: node --experimental-strip-types scripts/upstream-desktop-sync.ts

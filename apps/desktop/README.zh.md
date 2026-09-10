@@ -137,6 +137,16 @@ macOS 配置使用必填发布环境，不会接受钥匙串中最先发现的�
 
 Apple 的[App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons)规范要求 macOS 使用 1024×1024 方形布局、保持主体居中，并由系统应用最终的圆角矩形蒙版。图稿使用白色圆角背景和用户提供的 DeepSeek 蓝色标志，不加入自定义阴影或高光。
 
+### 自动上游同步
+
+`Upstream desktop sync` workflow 每六小时向 `deepseek-ai/deepseek-harness` 查询新的 `dsh-v*` tag。也可以手工运行并传入明确的 tag。
+
+干净导入会快进默认分支并推送 `desktop-v{same-semver-suffix}`，以便 `Desktop release` 构建未签名的 macOS arm64 与 Windows x64 安装包。有冲突或经 AI 处理的导入绝不推送该 tag。它会打开 draft pull request；你合并之后，自行推送 `desktop-v*` tag 才能切出 GitHub Release。
+
+请保存具有 contents、pull requests 与 workflow 权限的 `DESKTOP_SYNC_TOKEN` 或 `GH_PAT`，以便 tag 推送能够启动 `Desktop release`。`GITHUB_TOKEN` 仍可推送同步提交，但 GitHub 不会启动该后续 workflow。可选的 `ANTHROPIC_API_KEY`（优先）或 `OPENAI_API_KEY` 会在打开 pull request 之前让模型编辑剩余冲突文件。
+
+[上游 Desktop 同步 Agent Note](../../.agents/notes/implemented/process/2026-09-10-upstream-desktop-sync.zh.md) 负责 merge-base、overlay 允许列表和跳过规则。
+
 ### Windows EV 签名
 
 Windows 发布打包要求 `DSH_DESKTOP_WINDOWS_CER_FILE` 标识公开的 GlobalSign EV 叶证书，要求 `DSH_DESKTOP_WINDOWS_SIGNTOOL` 标识与 SafeNet 兼容的 SignTool 可执行文件，要求 `DSH_DESKTOP_WINDOWS_KEY_CONTAINER` 标识匹配的私钥容器，并要求 `DSH_DESKTOP_WINDOWS_TOKEN_PIN` 包含 SafeNet Token Password。证书文件保留在源码仓库之外，匹配的私钥仍位于 USB Token。运行固定 Windows 目标前设置这四个输入：
