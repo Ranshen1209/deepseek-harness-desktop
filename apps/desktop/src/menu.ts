@@ -6,7 +6,7 @@ import type { DesktopMessages } from './locale.ts'
 /**
  * Build the native application menu with locale-owned command labels.
  * @param options - Platform, application identity, translated labels, and command handlers.
- * @returns Electron menu entries; macOS retains its native application and quit labels.
+ * @returns Electron menu entries with macOS native editing, application, and window shortcuts.
  */
 export function createDesktopMenuTemplate(options: {
   readonly platform: NodeJS.Platform
@@ -17,7 +17,7 @@ export function createDesktopMenuTemplate(options: {
   readonly checkUpdates: () => void
 }): MenuItemConstructorOptions[] {
   const { platform, applicationName, messages, pluginsEnabled, openPlugins, checkUpdates } = options
-  return [{
+  const applicationMenu: MenuItemConstructorOptions = {
     label: platform === 'darwin' ? applicationName : messages.application,
     submenu: [
       {
@@ -28,7 +28,20 @@ export function createDesktopMenuTemplate(options: {
       },
       { label: messages.checkUpdatesMenu, click: checkUpdates },
       { type: 'separator' },
+      ...(platform === 'darwin' ? [
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+      ] satisfies MenuItemConstructorOptions[] : []),
       { role: 'quit', ...(platform === 'darwin' ? {} : { label: messages.quitMenu }) },
     ],
-  }]
+  }
+  if (platform !== 'darwin') return [applicationMenu]
+  return [
+    applicationMenu,
+    { role: 'fileMenu', label: messages.fileMenu },
+    { role: 'editMenu', label: messages.editMenu },
+    { role: 'windowMenu', label: messages.windowMenu },
+  ]
 }

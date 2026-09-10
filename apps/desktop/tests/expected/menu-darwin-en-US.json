@@ -1,0 +1,45 @@
+[
+  {
+    "label": "DeepSeek Harness",
+    "submenu": [
+      {
+        "label": "Manage Desktop Plugins",
+        "accelerator": "CmdOrCtrl+,",
+        "enabled": true
+      },
+      {
+        "label": "Check for Updates"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "role": "hide"
+      },
+      {
+        "role": "hideOthers"
+      },
+      {
+        "role": "unhide"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "role": "quit"
+      }
+    ]
+  },
+  {
+    "role": "fileMenu",
+    "label": "File"
+  },
+  {
+    "role": "editMenu",
+    "label": "Edit"
+  },
+  {
+    "role": "windowMenu",
+    "label": "Window"
+  }
+]
