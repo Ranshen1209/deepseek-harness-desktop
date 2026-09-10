@@ -1,0 +1,88 @@
+name: Desktop macOS release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'desktop-macos-v*'
+
+permissions:
+  contents: read
+
+env:
+  DSH_DESKTOP_APP_ID: com.deepseek.harness.desktop
+  DSH_DESKTOP_UNSIGNED: '1'
+
+jobs:
+  package-macos-arm64:
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        run: node .github/verify-desktop-version.mjs
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.17.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
+      - run: pnpm run generate:desktop-icons
+      - run: pnpm run package:desktop:mac:arm64
+      - run: node .github/verify-desktop-version.mjs mac-arm64
+      - name: Verify packaged macOS version and prepare downloads
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          artifacts='apps/desktop/.desktop-build/targets/mac-arm64/artifacts'
+          zip="deepseek-harness-$RELEASE_VERSION-mac-arm64.zip"
+          unzip -p "$artifacts/$zip" 'DeepSeek Harness.app/Contents/Info.plist' > "$RUNNER_TEMP/desktop-release.plist"
+          actual=$(plutil -extract CFBundleShortVersionString raw -o - "$RUNNER_TEMP/desktop-release.plist")
+          test "$actual" = "$RELEASE_VERSION"
+          mkdir installers
+          cp "$artifacts/deepseek-harness-$RELEASE_VERSION-mac-arm64.dmg" installers/
+          cp "$artifacts/$zip" installers/
+          (cd installers && shasum -a 256 *.dmg *.zip > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-arm64
+          path: installers/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-macos-v')
+    needs: package-macos-arm64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-macos-arm64
+          path: installers
+      - name: Publish macOS installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.package-macos-arm64.outputs.version }}
+        run: |
+          (cd installers && sha256sum -c SHA256SUMS.txt)
+          cat > release-notes.md <<'NOTES'
+          macOS arm64 release with native keyboard shortcuts restored.
+
+          - Native File, Edit, and Window menus restore Command+C/V/X/A/Z and window shortcuts.
+          - Application, bundled dsh, and installer filenames use the same complete upstream version.
+          - Includes DMG, ZIP, and SHA256SUMS.txt.
+
+          The app has an ad-hoc signature and is not notarized. Download the DMG for manual installation.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" installers/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "DeepSeek Harness Desktop $RELEASE_VERSION — macOS" \
+            --draft \
+            --notes-file release-notes.md
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest

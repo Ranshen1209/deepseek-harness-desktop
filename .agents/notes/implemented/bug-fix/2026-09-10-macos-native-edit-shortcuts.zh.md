@@ -1,15 +1,21 @@
-# Agent Note: 恢复 macOS 原生编辑快捷键
+# Agent Note: 恢复 macOS 原生快捷键
 
 Status: implemented
 
+[English](2026-09-10-macos-native-edit-shortcuts.md) | 中文
+
 ## Problem
 
-macOS Electron 应用只暴露了应用菜单。没有标准 Edit 菜单时，Command+C、Command+V、Command+X、Command+A、Command+Z 和 Command+Shift+Z 等 Chromium 编辑命令不会注册为原生菜单角色。
+替换 Electron 的默认应用菜单而不保留编辑和窗口角色，会移除 macOS 原生 Command 快捷键。
 
 ## Decision
 
-Desktop shell 为 macOS 增加仅限平台的 Edit 菜单，并使用 Electron 的 `undo`、`redo`、`cut`、`copy`、`paste` 和 `selectAll` 角色。Electron 为这些角色提供平台原生标签和 Command 快捷键。Windows 保留现有应用菜单，因为报告的问题只出现在 macOS 菜单栏。
+Desktop shell 在 macOS 上使用 Electron 的 `fileMenu`、`editMenu` 和 `windowMenu` 角色，并在应用菜单中加入隐藏、隐藏其他应用和全部显示角色。Electron 提供编辑操作、焦点路由和原生 Command 快捷键。顶层标签由 Desktop 语言字典管理。Windows 保留现有菜单模板。
 
-## Verification
+## Alternatives considered
 
-Desktop 菜单测试会断言 macOS Edit 菜单角色以及现有应用菜单行为。修改后的 locale 和菜单定向测试已通过。
+**在渲染器中处理每个按键或注册全局快捷键。** 渲染器监听器会重复实现原生编辑行为和焦点路由。全局快捷键会占用应用外的按键。Electron 菜单角色将快捷键限定在活动应用及焦点窗口内。
+
+## Consequences
+
+locale 和菜单测试覆盖两个 macOS 菜单快照及 Windows 菜单。原生按键传递需要运行 macOS Electron 应用；模板快照本身不能验证操作系统按键事件。

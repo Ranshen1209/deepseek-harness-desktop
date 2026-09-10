@@ -13,7 +13,7 @@ for (const app of ['cli', 'desktop', 'desktop-host']) {
 }
 if (process.env.GITHUB_REF_TYPE === 'tag') {
   assert.ok(
-    [`desktop-v${version}`, `desktop-windows-v${version}`].includes(process.env.GITHUB_REF_NAME),
+    [`desktop-v${version}`, `desktop-windows-v${version}`, `desktop-macos-v${version}`].includes(process.env.GITHUB_REF_NAME),
     `Release tag must use the complete package version ${version}`,
   )
 }

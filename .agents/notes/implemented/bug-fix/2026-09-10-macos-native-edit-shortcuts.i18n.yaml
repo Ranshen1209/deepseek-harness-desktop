@@ -1,4 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state.
-2026-09-10-macos-native-edit-shortcuts.md: 1f665e24bff908bed4b72527a3c004f988c9c38c
-2026-09-10-macos-native-edit-shortcuts.zh.md: fd296a2eba9bdd4bd9fc662bb626dc9402763a73
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-10-macos-native-edit-shortcuts.md
+2026-09-10-macos-native-edit-shortcuts.md: f3518122b1b39823072e2e8274474947669c9b0c
+2026-09-10-macos-native-edit-shortcuts.zh.md: dfd64f076629bdfc98ceee42d124f4abf8928355

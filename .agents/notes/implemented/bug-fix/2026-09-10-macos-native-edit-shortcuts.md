@@ -1,15 +1,21 @@
-# Agent Note: Restore macOS native editing shortcuts
+# Agent Note: Restore macOS native shortcuts
 
 Status: implemented
 
+English | [中文](2026-09-10-macos-native-edit-shortcuts.zh.md)
+
 ## Problem
 
-The macOS Electron application exposed only its application menu. Without a standard Edit menu, Chromium editing commands such as Command+C, Command+V, Command+X, Command+A, Command+Z, and Command+Shift+Z were not registered as native menu roles.
+Replacing Electron's default application menu without its editing and window roles removes native macOS Command shortcuts.
 
 ## Decision
 
-The Desktop shell adds a macOS-only Edit menu with Electron's `undo`, `redo`, `cut`, `copy`, `paste`, and `selectAll` roles. Electron supplies the platform-native labels and Command accelerators for these roles. Windows keeps its existing application menu because the reported defect is specific to the macOS menu bar.
+The Desktop shell uses Electron's `fileMenu`, `editMenu`, and `windowMenu` roles on macOS, plus application-menu hide, hide-others, and unhide roles. Electron supplies editing actions, focus routing, and native Command accelerators. Top-level labels belong to the Desktop locale dictionaries. Windows keeps its existing menu template.
 
-## Verification
+## Alternatives considered
 
-The Desktop menu tests assert the macOS Edit menu roles and the existing application menu behavior. The focused locale and menu tests pass after the change.
+**Handle each key in the renderer or register global shortcuts.** Renderer listeners duplicate native editing behavior and focus routing. Global shortcuts consume keys outside the app. Electron menu roles keep shortcuts scoped to the active application and focused window.
+
+## Consequences
+
+The locale and menu tests cover both macOS menu snapshots and the Windows menu. Native keyboard delivery needs a running macOS Electron application; a template snapshot alone does not exercise OS key events.
