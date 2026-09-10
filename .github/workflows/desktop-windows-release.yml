@@ -18,6 +18,7 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v6
+      - run: node .github/verify-desktop-version.mjs
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -29,6 +30,7 @@ jobs:
       - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
       - run: pnpm run generate:desktop-icons
       - run: pnpm run package:desktop:win:x64
+      - run: node .github/verify-desktop-version.mjs win-x64
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-x64

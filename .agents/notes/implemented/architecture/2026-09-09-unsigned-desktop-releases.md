@@ -16,7 +16,7 @@ The application icon is generated from `apps/desktop/build/icon.svg`, which cont
 
 The Windows ICO receives a full-bleed rounded white backing during generation and reuses the supplied mark at about 70% of the canvas width. The source artwork keeps its Apple-style inset, while the Windows resource avoids transparent margins and preserves a readable foreground at shell icon sizes.
 
-GitHub Actions builds unsigned macOS arm64 and Windows x64 artifacts on native runners. A manual run or `desktop-v*` tag creates a GitHub Release and uploads the installers. The workflow never receives signing credentials, and the signed path remains the default when the flag is absent.
+GitHub Actions builds unsigned macOS arm64 and Windows x64 artifacts on native runners. Manual runs retain artifacts; a `desktop-v<version>` tag publishes a normal GitHub Release after both targets pass. The tag, root, CLI, Desktop, Desktop Host, seed, installer filenames, and native application version metadata must agree on the complete upstream version. Renaming an installer or stripping a prerelease suffix cannot upgrade its bundled dsh. The workflow uploads all installers and SHA-256 checksums to a draft before publishing it as latest. GitHub release status is independent of upstream stability and signing; the workflow never receives signing credentials, and the signed path remains the default when the flag is absent.
 
 The Windows runtime preparation extracts the pinned Node.js ZIP with the runner's `tar` implementation. This avoids a pending archive read stream observed in native Windows CI while preserving the same checksum and executable verification steps.
 
