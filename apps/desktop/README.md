@@ -131,7 +131,7 @@ The macOS configuration uses the required release environment instead of accepti
 
 Set `DSH_DESKTOP_UNSIGNED=1` to package a local test build without Developer ID, notarization, or Windows token credentials. The build uses an ad-hoc macOS signature, produces an unsigned Windows NSIS installer, disables update metadata, and does not write an upload completion record.
 
-The repository workflow `Desktop release` builds these packages for macOS arm64 and Windows x64. Run it manually or push a tag such as `desktop-v0.1.3-alpha.2` to create a GitHub Release. These packages are for local testing; macOS Gatekeeper can report that the developer cannot be verified.
+The repository workflow `Desktop release` builds these packages for macOS arm64 and Windows x64. Manual runs retain build artifacts; a `desktop-v<version>` tag publishes a GitHub Release after both builds pass. The complete tag version must match the root, CLI, Desktop, and Desktop Host manifests. Native runners check the prepared seed and installer filenames before upload. The publisher uploads only `deepseek-harness-*.{dmg,zip,exe}` installers and reuses an existing Release on retry. The `Desktop macOS release` workflow accepts `desktop-macos-v<version>` tags, checks the ZIP application version, and publishes only macOS arm64 DMG and ZIP downloads with `SHA256SUMS.txt`. Installers retain the complete upstream version, including any `alpha` or `rc` suffix. GitHub release status does not imply code signing or upstream stability; Gatekeeper and SmartScreen can warn about these packages.
 
 The source icon is `build/icon.svg`. `generate:desktop-icons` renders the 1024×1024 artwork and writes `icon.icns`, `icon.ico`, and `icon.png` from the same source.
 

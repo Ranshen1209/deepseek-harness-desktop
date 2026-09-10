@@ -1,0 +1,45 @@
+[
+  {
+    "label": "DeepSeek Harness",
+    "submenu": [
+      {
+        "label": "桌面插件管理",
+        "accelerator": "CmdOrCtrl+,",
+        "enabled": true
+      },
+      {
+        "label": "检查更新"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "role": "hide"
+      },
+      {
+        "role": "hideOthers"
+      },
+      {
+        "role": "unhide"
+      },
+      {
+        "type": "separator"
+      },
+      {
+        "role": "quit"
+      }
+    ]
+  },
+  {
+    "role": "fileMenu",
+    "label": "文件"
+  },
+  {
+    "role": "editMenu",
+    "label": "编辑"
+  },
+  {
+    "role": "windowMenu",
+    "label": "窗口"
+  }
+]

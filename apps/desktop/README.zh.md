@@ -131,7 +131,7 @@ macOS 配置使用必填发布环境，不会接受钥匙串中最先发现的�
 
 设置 `DSH_DESKTOP_UNSIGNED=1` 可以在没有 Developer ID、公证凭据或 Windows Token 的情况下生成本机测试包。该模式使用 macOS ad-hoc 签名，生成未签名的 Windows NSIS 安装器，关闭更新元数据，并且不会写入上传完成记录。
 
-仓库中的 `Desktop release` workflow 会构建 macOS arm64 与 Windows x64 包。可以手动运行它，也可以推送类似 `desktop-v0.1.3-alpha.2` 的 tag 来创建 GitHub Release。这些包用于本机测试；macOS Gatekeeper 可能提示无法验证开发者。
+仓库中的 `Desktop release` workflow 会构建 macOS arm64 与 Windows x64 包。手动运行会保留构建产物；推送 `desktop-v<version>` tag 会在两个平台构建通过后发布 GitHub Release。tag 的完整版本必须与根目录、CLI、Desktop 和 Desktop Host 的清单一致。原生 runner 会在上传前核对准备好的 seed 和安装包文件名。发布脚本只上传 `deepseek-harness-*.{dmg,zip,exe}` 安装包，并在重试时复用已有 Release。`Desktop macOS release` workflow 接受 `desktop-macos-v<version>` tag，检查 ZIP 中的应用版本，并且只发布带 `SHA256SUMS.txt` 的 macOS arm64 DMG 和 ZIP 下载。安装包保留完整上游版本，包括任何 `alpha` 或 `rc` 后缀。GitHub Release 状态不代表代码已签名或上游版本已稳定；Gatekeeper 和 SmartScreen 仍可能对这些包发出提示。
 
 源图标位于 `build/icon.svg`。`generate:desktop-icons` 从同一份源文件渲染 1024×1024 图稿，并生成 `icon.icns`、`icon.ico` 与 `icon.png`。
 
