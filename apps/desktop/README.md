@@ -137,6 +137,16 @@ The source icon is `build/icon.svg`. `generate:desktop-icons` renders the 1024×
 
 Apple’s [App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons) guidance specifies a 1024×1024 square layout for macOS, keeps primary content centered, and lets the system apply the final rounded-rectangle mask. The artwork uses a white rounded background layer and the supplied DeepSeek blue mark, with no custom shadow or highlight.
 
+### Automated upstream sync
+
+The `Upstream desktop sync` workflow polls `deepseek-ai/deepseek-harness` for new `dsh-v*` tags every six hours. You can also run it by hand and pass an explicit tag.
+
+A clean import fast-forwards the default branch and pushes `desktop-v{same-semver-suffix}` so `Desktop release` builds the unsigned macOS arm64 and Windows x64 installers. After that tag push, the sync job dispatches `Desktop release` on the tag if GitHub did not already start it from the push. A conflicted or AI-resolved import never pushes that tag and never dispatches packaging. It opens a draft pull request; after you merge it, push the `desktop-v*` tag yourself to cut the GitHub Release.
+
+Store `DESKTOP_SYNC_TOKEN` or `GH_PAT` (contents, pull requests, workflow, and actions scopes) so the tag push can start `Desktop release` immediately. `GITHUB_TOKEN` can still push the sync commit and open the pull request; the dispatch fallback then starts packaging. Optional `ANTHROPIC_API_KEY` (preferred) or `OPENAI_API_KEY` asks a model to edit remaining conflicted files before the pull request opens.
+
+The [upstream desktop sync Agent Note](../../.agents/notes/implemented/process/2026-09-10-upstream-desktop-sync.md) owns the merge-base, overlay allowlist, and skip rules.
+
 ### Windows EV signing
 
 Windows release packaging requires `DSH_DESKTOP_WINDOWS_CER_FILE` to identify the public GlobalSign EV leaf certificate, `DSH_DESKTOP_WINDOWS_SIGNTOOL` to identify the SafeNet-compatible SignTool executable, `DSH_DESKTOP_WINDOWS_KEY_CONTAINER` to identify the matching private-key container, and `DSH_DESKTOP_WINDOWS_TOKEN_PIN` to contain the SafeNet Token Password. The certificate file remains outside source control, and the matching private key stays on the USB token. Set the four inputs before running the fixed Windows target:
