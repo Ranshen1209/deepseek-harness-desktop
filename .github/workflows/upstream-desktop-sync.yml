@@ -4,9 +4,11 @@
 # A conflicted or AI-resolved import opens a draft pull request and never tags.
 #
 # GITHUB_TOKEN can push the sync branch and open the pull request, but GitHub
-# does not start other workflows from a GITHUB_TOKEN tag push. Set
-# DESKTOP_SYNC_TOKEN (or GH_PAT) to a PAT with contents, pull requests, and
-# workflow scopes so a clean desktop-v* tag runs Desktop release.
+# does not start other workflows from a GITHUB_TOKEN tag push. After a clean
+# tag push, the script lists Desktop release runs for that tag and dispatches
+# desktop-release.yml when none started. Set DESKTOP_SYNC_TOKEN (or GH_PAT)
+# to a PAT with contents, pull requests, workflow, and actions scopes so the
+# tag push itself can start Desktop release; dispatch remains the fallback.
 name: Upstream desktop sync
 
 on:
@@ -27,6 +29,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   sync:

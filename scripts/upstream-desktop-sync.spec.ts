@@ -10,7 +10,9 @@ import {
   classifyConflictedPaths,
   compareReleaseVersions,
   decideSyncOutcome,
+  desktopReleaseRunMatchesTag,
   desktopTagForUpstream,
+  ensureDesktopReleaseWorkflow,
   hasConflictMarkers,
   isDesktopPackageScript,
   isOverlayPath,
@@ -18,6 +20,7 @@ import {
   parseMergeTreeNameOnly,
   restoreDesktopPackageScripts,
   selectNewestUpstreamTag,
+  shouldDispatchDesktopRelease,
   stripAiFence,
   versionFromReleaseTag,
 } from './upstream-desktop-sync.ts'
@@ -90,6 +93,7 @@ describe('overlay ownership', () => {
     expect(isOverlayPath('apps/desktop/build/icon.svg')).toBe(true)
     expect(isOverlayPath('apps/desktop/src/menu.ts')).toBe(true)
     expect(isOverlayPath('scripts/upstream-desktop-sync.ts')).toBe(true)
+    expect(isOverlayPath('scripts/upload-desktop-github-release.ts')).toBe(true)
     expect(isOverlayPath('apps/desktop/src/main.ts')).toBe(false)
     expect(isOverlayPath('package.json')).toBe(false)
     expect(classifyConflictedPaths([
@@ -159,6 +163,10 @@ describe('sync outcome', () => {
       needsHumanReview: false,
       defaultBranchUpdated: true,
     })).toBe('published')
+    expect(shouldDispatchDesktopRelease('pull_request', false)).toBe(false)
+    expect(shouldDispatchDesktopRelease('skipped', false)).toBe(false)
+    expect(shouldDispatchDesktopRelease('published', true)).toBe(false)
+    expect(shouldDispatchDesktopRelease('published', false)).toBe(true)
   })
 })
 
@@ -186,6 +194,43 @@ describe('merge-tree parse and AI helpers', () => {
     expect(hasConflictMarkers('<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> tag\n')).toBe(true)
     expect(hasConflictMarkers('const x = 1\n')).toBe(false)
     expect(buildConflictResolutionPrompt('pkg.json', '<<<<<<< HEAD\n')).toContain('Path: pkg.json')
+  })
+})
+
+describe('Desktop release dispatch after a clean tag', () => {
+  it('observes an already-started run and otherwise dispatches on the tag ref', async () => {
+    expect(desktopReleaseRunMatchesTag('[{"headBranch":"desktop-v0.1.9","event":"push","status":"queued"}]', 'desktop-v0.1.9')).toBe(true)
+    expect(desktopReleaseRunMatchesTag('[]', 'desktop-v0.1.9')).toBe(false)
+    const observedCalls: string[][] = []
+    await expect(ensureDesktopReleaseWorkflow({
+      gh: (args) => {
+        observedCalls.push(args)
+        return { status: 0, stdout: '[{"headBranch":"desktop-v0.1.9","event":"push","status":"in_progress"}]', stderr: '' }
+      },
+    }, 'Ranshen1209/deepseek-harness-desktop', 'desktop-v0.1.9', {
+      attempts: 1,
+      delayMs: 0,
+      sleep: async () => {},
+    })).resolves.toBe('observed')
+    expect(observedCalls.some(args => args[0] === 'workflow')).toBe(false)
+
+    const dispatchCalls: string[][] = []
+    await expect(ensureDesktopReleaseWorkflow({
+      gh: (args) => {
+        dispatchCalls.push(args)
+        if (args[0] === 'run') return { status: 0, stdout: '[]', stderr: '' }
+        return { status: 0, stdout: '', stderr: '' }
+      },
+    }, 'Ranshen1209/deepseek-harness-desktop', 'desktop-v0.1.9', {
+      attempts: 1,
+      delayMs: 0,
+      sleep: async () => {},
+    })).resolves.toBe('dispatched')
+    expect(dispatchCalls).toContainEqual([
+      'workflow', 'run', 'desktop-release.yml',
+      '--repo', 'Ranshen1209/deepseek-harness-desktop',
+      '--ref', 'desktop-v0.1.9',
+    ])
   })
 })
 
@@ -263,7 +308,7 @@ describe('upstream-desktop-sync workflow', () => {
     }
     expect(workflow.on.schedule[0]?.cron).toBe('17 */6 * * *')
     expect(workflow.on.workflow_dispatch.inputs.upstream_tag).toBeTruthy()
-    expect(workflow.permissions).toEqual({ contents: 'write', 'pull-requests': 'write' })
+    expect(workflow.permissions).toEqual({ contents: 'write', 'pull-requests': 'write', actions: 'write' })
     expect(workflow.concurrency).toEqual({ group: 'upstream-desktop-sync', 'cancel-in-progress': false })
     const checkout = workflow.jobs.sync.steps.find(step => step.uses === 'actions/checkout@v6')
     expect(checkout?.with?.['fetch-depth']).toBe(0)

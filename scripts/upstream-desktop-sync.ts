@@ -50,6 +50,8 @@ const OVERLAY_PATHS = new Set([
   'apps/desktop/tests/macos-signature.spec.ts',
   'scripts/upstream-desktop-sync.ts',
   'scripts/upstream-desktop-sync.spec.ts',
+  'scripts/upload-desktop-github-release.ts',
+  'scripts/upload-desktop-github-release.spec.ts',
 ])
 
 /** Parsed `MAJOR.MINOR.PATCH` with an optional prerelease identifier list. */
@@ -126,6 +128,7 @@ export function isOverlayPath(path: string): boolean {
   const normalized = normalizeRepoPath(path)
   if (OVERLAY_PATHS.has(normalized)) return true
   return normalized.startsWith('scripts/upstream-desktop-sync')
+    || normalized.startsWith('scripts/upload-desktop-github-release')
 }
 
 /**
@@ -745,6 +748,12 @@ function originHasRef(cwd: string, ref: string): boolean {
   return result.status === 0
 }
 
+function githubRepository(): string {
+  const repo = emptyToUndefined(process.env.GITHUB_REPOSITORY)
+  if (repo === undefined) throw new Error('GITHUB_REPOSITORY is unset')
+  return repo
+}
+
 function runGh(host: SyncHost, args: string[], context: string): string {
   if (host.gh === undefined) {
     const result = spawnSync('gh', args, { env: process.env, maxBuffer: MAX_GIT_OUTPUT, encoding: 'utf8' })
@@ -756,6 +765,79 @@ function runGh(host: SyncHost, args: string[], context: string): string {
   const result = host.gh(args)
   if (result.status !== 0) throw new Error(`${context}: ${result.stderr.trim() || result.stdout.trim()}`)
   return result.stdout
+}
+
+/**
+ * Report whether a `gh run list` payload already includes a Desktop release for `tag`.
+ * @param stdout - JSON array from `gh run list`.
+ * @param tag - Desktop tag such as `desktop-v0.1.5-rc.1`.
+ * @returns True when any run's `headBranch` equals the tag.
+ */
+export function desktopReleaseRunMatchesTag(stdout: string, tag: string): boolean {
+  const parsed: unknown = JSON.parse(stdout === '' ? '[]' : stdout)
+  if (!Array.isArray(parsed)) throw new Error('gh run list did not return a JSON array')
+  return parsed.some(run => isRecord(run) && run.headBranch === tag)
+}
+
+/**
+ * Report whether this sync may dispatch `desktop-release.yml`.
+ * @param outcome - Result of `decideSyncOutcome`.
+ * @param matchingRunFound - True when a Desktop release run already targets the tag.
+ * @returns True only for a published tag that has not started packaging.
+ */
+export function shouldDispatchDesktopRelease(outcome: SyncOutcome, matchingRunFound: boolean): boolean {
+  return outcome === 'published' && !matchingRunFound
+}
+
+/** Polling knobs for `ensureDesktopReleaseWorkflow`. */
+export interface DesktopReleaseDispatchTiming {
+  attempts?: number
+  delayMs?: number
+  sleep?: (ms: number) => Promise<void>
+}
+
+/**
+ * Wait briefly for `desktop-release.yml` to start from the tag push, then dispatch it.
+ *
+ * GitHub does not start other workflows from a `GITHUB_TOKEN` tag push. A PAT
+ * with workflow scope usually starts Desktop release immediately; dispatch is
+ * the fallback when no matching run appears. Conflicted imports never call this.
+ * @param host - GitHub CLI adapter.
+ * @param repo - `owner/name` repository slug.
+ * @param tag - Desktop tag that must already exist on origin.
+ * @param timing - Poll count, delay, and optional sleep replacement.
+ * @returns `observed` when a run already targets `tag`, otherwise `dispatched`.
+ */
+export async function ensureDesktopReleaseWorkflow(
+  host: SyncHost,
+  repo: string,
+  tag: string,
+  timing: DesktopReleaseDispatchTiming = {},
+): Promise<'observed' | 'dispatched'> {
+  const attempts = timing.attempts ?? 4
+  const delayMs = timing.delayMs ?? 5_000
+  const sleep = timing.sleep ?? (async (ms: number) => {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, ms)
+    })
+  })
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await sleep(delayMs)
+    const stdout = runGh(host, [
+      'run', 'list',
+      '--workflow', 'desktop-release.yml',
+      '--repo', repo,
+      '--json', 'headBranch,event,status',
+      '--limit', '30',
+    ], 'cannot list Desktop release runs')
+    if (desktopReleaseRunMatchesTag(stdout, tag)) return 'observed'
+  }
+  runGh(host, [
+    'workflow', 'run', 'desktop-release.yml',
+    '--repo', repo,
+    '--ref', tag,
+  ], 'cannot dispatch Desktop release')
+  return 'dispatched'
 }
 
 /**
@@ -828,7 +910,10 @@ export async function runUpstreamDesktopSync(args: string[], host: SyncHost = {}
   if (outcome === 'published') {
     requireGit(cwd, ['tag', '-a', desktopTag, '-m', `Desktop release for upstream ${upstreamTag}`], `cannot create ${desktopTag}`)
     requireGit(cwd, ['push', 'origin', `refs/tags/${desktopTag}`], `cannot push ${desktopTag}`)
-    log(`published ${desktopTag}`)
+    const started = await ensureDesktopReleaseWorkflow(host, githubRepository(), desktopTag)
+    log(started === 'observed'
+      ? `published ${desktopTag}; Desktop release already started`
+      : `published ${desktopTag}; dispatched Desktop release`)
     return outcome
   }
   const body = pullRequestBody({
@@ -840,7 +925,7 @@ export async function runUpstreamDesktopSync(args: string[], host: SyncHost = {}
   })
   const existing = runGh(host, [
     'pr', 'list',
-    '--repo', process.env.GITHUB_REPOSITORY ?? '',
+    '--repo', githubRepository(),
     '--head', branch,
     '--state', 'open',
     '--json', 'number',
@@ -850,7 +935,7 @@ export async function runUpstreamDesktopSync(args: string[], host: SyncHost = {}
   if (!hasOpenPr) {
     runGh(host, [
       'pr', 'create',
-      '--repo', process.env.GITHUB_REPOSITORY ?? '',
+      '--repo', githubRepository(),
       '--draft',
       '--base', options.defaultBranch,
       '--head', branch,

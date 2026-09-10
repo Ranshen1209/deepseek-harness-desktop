@@ -141,9 +141,9 @@ Apple’s [App icons](https://developer.apple.com/design/human-interface-guideli
 
 The `Upstream desktop sync` workflow polls `deepseek-ai/deepseek-harness` for new `dsh-v*` tags every six hours. You can also run it by hand and pass an explicit tag.
 
-A clean import fast-forwards the default branch and pushes `desktop-v{same-semver-suffix}` so `Desktop release` builds the unsigned macOS arm64 and Windows x64 installers. A conflicted or AI-resolved import never pushes that tag. It opens a draft pull request; after you merge it, push the `desktop-v*` tag yourself to cut the GitHub Release.
+A clean import fast-forwards the default branch and pushes `desktop-v{same-semver-suffix}` so `Desktop release` builds the unsigned macOS arm64 and Windows x64 installers. After that tag push, the sync job dispatches `Desktop release` on the tag if GitHub did not already start it from the push. A conflicted or AI-resolved import never pushes that tag and never dispatches packaging. It opens a draft pull request; after you merge it, push the `desktop-v*` tag yourself to cut the GitHub Release.
 
-Store `DESKTOP_SYNC_TOKEN` or `GH_PAT` (contents, pull requests, and workflow scopes) so the tag push can start `Desktop release`. `GITHUB_TOKEN` can still push the sync commit, but GitHub will not start that follow-up workflow. Optional `ANTHROPIC_API_KEY` (preferred) or `OPENAI_API_KEY` asks a model to edit remaining conflicted files before the pull request opens.
+Store `DESKTOP_SYNC_TOKEN` or `GH_PAT` (contents, pull requests, workflow, and actions scopes) so the tag push can start `Desktop release` immediately. `GITHUB_TOKEN` can still push the sync commit and open the pull request; the dispatch fallback then starts packaging. Optional `ANTHROPIC_API_KEY` (preferred) or `OPENAI_API_KEY` asks a model to edit remaining conflicted files before the pull request opens.
 
 The [upstream desktop sync Agent Note](../../.agents/notes/implemented/process/2026-09-10-upstream-desktop-sync.md) owns the merge-base, overlay allowlist, and skip rules.
 
