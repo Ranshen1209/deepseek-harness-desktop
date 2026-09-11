@@ -63,7 +63,7 @@ describe('desktop seed store cleanup', () => {
 })
 
 describe('desktop seed store merge', () => {
-  it('preserves installed package records while the verified seed replaces matching records and files', { timeout: 30_000 }, () => {
+  it('preserves installed package records while the verified seed replaces matching records and files', { timeout: 30_000 }, async () => {
     const root = temporaryRoot()
     const source = join(root, 'source')
     const destination = join(root, 'destination')
@@ -85,7 +85,7 @@ describe('desktop seed store merge', () => {
     writeFileSync(join(destination, 'v11', 'files', 'shared'), 'old')
     writeFileSync(join(destination, 'v11', 'files', 'plugin'), 'plugin')
 
-    mergePnpmStore(source, destination)
+    await mergePnpmStore(source, destination)
 
     const database = new DatabaseSync(join(destination, 'v11', 'index.db'), { readOnly: true })
     const records = database.prepare('SELECT key, data FROM package_index ORDER BY key').all() as {
@@ -101,10 +101,31 @@ describe('desktop seed store merge', () => {
     expect(readFileSync(join(destination, 'v11', 'files', 'shared'), 'utf8')).toBe('new')
     expect(readFileSync(join(destination, 'v11', 'files', 'plugin'), 'utf8')).toBe('plugin')
   })
+
+  it('moves an extracted store into an empty destination instead of copying it', async () => {
+    const root = temporaryRoot()
+    const source = join(root, 'source')
+    const destination = join(root, 'destination')
+    mkdirSync(join(source, 'v11', 'files'), { recursive: true })
+    writeFileSync(join(source, 'v11', 'files', 'package-data'), 'package')
+    const database = new DatabaseSync(join(source, 'v11', 'index.db'))
+    database.exec('CREATE TABLE package_index (key TEXT PRIMARY KEY, data BLOB NOT NULL) WITHOUT ROWID')
+    database.prepare('INSERT INTO package_index (key, data) VALUES (?, ?)').run('seed-only', Buffer.from('seed'))
+    database.close()
+
+    await mergePnpmStore(source, destination)
+
+    expect(existsSync(source)).toBe(false)
+    expect(readFileSync(join(destination, 'v11', 'files', 'package-data'), 'utf8')).toBe('package')
+    const merged = new DatabaseSync(join(destination, 'v11', 'index.db'), { readOnly: true })
+    const records = merged.prepare('SELECT key FROM package_index').all() as { key: string }[]
+    merged.close()
+    expect(records.map(record => record.key)).toEqual(['seed-only'])
+  })
 })
 
 describe('desktop seed store archives', () => {
-  it('extracts package bytes and executable modes without retaining loose seed files', () => {
+  it('extracts package bytes and executable modes without retaining loose seed files', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
     const store = join(seed, 'store')
@@ -116,7 +137,7 @@ describe('desktop seed store archives', () => {
 
     archivePnpmStore(seed, store)
     const destination = join(root, 'extracted')
-    extractPnpmStoreArchives(seed, destination)
+    await extractPnpmStoreArchives(seed, destination)
 
     expect(existsSync(store)).toBe(false)
     expect(readFileSync(join(destination, 'v10', 'files', 'package-data'), 'utf8')).toBe('package')
@@ -146,7 +167,7 @@ describe('desktop seed store archives', () => {
     expect(second.map(entry => entry.body)).toEqual(first.map(entry => entry.body))
   })
 
-  it('rejects an archive whose entry count differs from the manifest', () => {
+  it('rejects an archive whose entry count differs from the manifest', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
     const store = join(seed, 'store')
@@ -162,6 +183,6 @@ describe('desktop seed store archives', () => {
     archive.entries += 1
     writeFileSync(manifestPath, JSON.stringify(manifest))
 
-    expect(() => { extractPnpmStoreArchives(seed, join(root, 'extracted')) }).toThrow(/unexpected entry count/u)
+    await expect(extractPnpmStoreArchives(seed, join(root, 'extracted'))).rejects.toThrow(/unexpected entry count/u)
   })
 })

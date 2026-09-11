@@ -11,11 +11,12 @@ import {
   packageNameFromSpec,
   verifySeedIntegrity,
   type DesktopProjectHooks,
+  type DesktopReleaseProgressPhase,
 } from '../src/project-manager.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import { DESKTOP_PACKAGES_DIR, DESKTOP_PACKAGE_SET_FILE } from '../src/core-package-set.ts'
 import type { DesktopRelease } from '../src/release.ts'
-import { archivePnpmStore } from '../src/seed-store.ts'
+import { archivePnpmStore, SEED_STORE_ARCHIVE_DIR } from '../src/seed-store.ts'
 
 const roots: string[] = []
 const releaseWorkers: Array<() => Promise<void>> = []
@@ -181,14 +182,14 @@ describe('desktop package policy', () => {
     expect(() => packageNameFromSpec('https://example.test/plugin.tgz')).toThrow(/unsupported npm package spec/u)
   })
 
-  it('rejects any seed content changed after release inventory generation', () => {
+  it('rejects any seed content changed after release inventory generation', async () => {
     const seed = join(temporaryRoot(), 'seed')
     createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     writeIntegrity(seed)
-    expect(() => { verifySeedIntegrity(seed) }).not.toThrow()
+    await expect(verifySeedIntegrity(seed)).resolves.toBeUndefined()
     writeFileSync(join(seed, 'package.json'), '{}\n')
-    expect(() => { verifySeedIntegrity(seed) }).toThrow(/integrity verification failed/u)
+    await expect(verifySeedIntegrity(seed)).rejects.toThrow(/integrity verification failed/u)
   })
 })
 
@@ -406,5 +407,39 @@ describe('desktop project transactions', () => {
     expect(readFileSync(join(paths.pnpm.store, 'release-1'), 'utf8')).toBe('one')
     expect(readFileSync(join(paths.pnpm.store, 'release-2'), 'utf8')).toBe('two')
     await expect(manager.applyRelease(nextSeed, '1.1.0', hooks())).resolves.toBe(false)
+  })
+
+  it('reuses a matching installed release without reading seed store archives', async () => {
+    const root = temporaryRoot()
+    const seed = join(root, 'seed')
+    createTestSeedMetadata(seed, release())
+    writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+    archiveStore(seed)
+    writeIntegrity(seed)
+    const paths = resolveDesktopPaths(join(root, '.dsh'))
+    const manager = new DesktopProjectManager(paths, { node: process.execPath, pnpm: writeFakePnpm(root) })
+    expect(manager.matchesPackagedRelease(seed, '1.0.0')).toBe(false)
+    await manager.applyRelease(seed, '1.0.0', hooks())
+    expect(manager.matchesPackagedRelease(seed, '1.0.0')).toBe(true)
+    expect(() => { manager.matchesPackagedRelease(seed, '2.0.0') }).toThrow(/does not match Electron/u)
+    rmSync(join(seed, SEED_STORE_ARCHIVE_DIR), { recursive: true })
+    await expect(manager.applyRelease(seed, '1.0.0', hooks())).resolves.toBe(false)
+  })
+
+  it('reports seed-install progress only while the packaged release is applied', async () => {
+    const root = temporaryRoot()
+    const seed = join(root, 'seed')
+    createTestSeedMetadata(seed, release())
+    writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
+    archiveStore(seed)
+    writeIntegrity(seed)
+    const paths = resolveDesktopPaths(join(root, '.dsh'))
+    const manager = new DesktopProjectManager(paths, { node: process.execPath, pnpm: writeFakePnpm(root) })
+    const phases: DesktopReleaseProgressPhase[] = []
+    await expect(manager.applyRelease(seed, '1.0.0', hooks(), (phase) => { phases.push(phase) })).resolves.toBe(true)
+    expect(phases).toEqual(['verifying', 'store', 'installing', 'health', 'activating'])
+    const reuse: DesktopReleaseProgressPhase[] = []
+    await expect(manager.applyRelease(seed, '1.0.0', hooks(), (phase) => { reuse.push(phase) })).resolves.toBe(false)
+    expect(reuse).toEqual([])
   })
 })

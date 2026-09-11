@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self' data:">
+    <title id="page-title"></title>
+    <link rel="stylesheet" href="plugin-manager.css">
+    <link rel="stylesheet" href="first-run.css">
+  </head>
+  <body>
+    <main class="setup">
+      <section class="setup-card">
+        <div class="spinner" aria-hidden="true"></div>
+        <h1 id="title"></h1>
+        <p id="description"></p>
+        <p id="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="first-run.js"></script>
+  </body>
+</html>

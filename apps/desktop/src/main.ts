@@ -10,12 +10,13 @@ import {
   ipcMain,
   Menu,
   protocol,
+  type BrowserWindowConstructorOptions,
   type IpcMainInvokeEvent,
 } from 'electron'
 import { resolveDesktopPaths } from './paths.ts'
 import { DesktopProjectManager, type DesktopProjectHooks } from './project-manager.ts'
 import { DesktopHostProcess } from './host-process.ts'
-import { DESKTOP_IPC, type DesktopUpdateState } from './ipc.ts'
+import { DESKTOP_IPC, type DesktopSetupState, type DesktopUpdateState } from './ipc.ts'
 import { formatDesktopMessage, resolveDesktopLocale } from './locale.ts'
 import { createDesktopMenuTemplate } from './menu.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
@@ -80,19 +81,21 @@ function developmentHostInspectPort(enabled: boolean): number | undefined {
   return port
 }
 
-function createWindow(preload: string): BrowserWindow {
+function createWindow(preload: string, options: BrowserWindowConstructorOptions = {}): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 880,
     minHeight: 600,
     show: false,
+    ...options,
     webPreferences: {
       preload,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
+      ...options.webPreferences,
     },
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -148,6 +151,9 @@ async function main(): Promise<void> {
   const messages = locale.messages
   const appPreload = fileURLToPath(new URL('./preload-app.cjs', import.meta.url))
   const managementPreload = fileURLToPath(new URL('./preload.cjs', import.meta.url))
+  let setupWindow: BrowserWindow | undefined
+  let setupState: DesktopSetupState = { phase: 'verifying' }
+  let seedInstallInProgress = false
 
   const publishUpdate = (state: DesktopUpdateState): DesktopUpdateState => {
     updateState = state
@@ -156,6 +162,34 @@ async function main(): Promise<void> {
     }
     return state
   }
+  const publishSetup = (state: DesktopSetupState): DesktopSetupState => {
+    setupState = state
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(DESKTOP_IPC.setupState, state)
+    }
+    return state
+  }
+
+  protocol.handle(SCHEME, (request) => {
+    const url = new URL(request.url)
+    if (url.hostname === 'shell') return serveShellAsset(request)
+    if (url.hostname !== 'app') return Promise.resolve(new Response(null, { status: 404 }))
+    const active = host
+    if (active === undefined) return Promise.resolve(new Response('backend unavailable', { status: 503 }))
+    return active.fetch(request)
+  })
+  ipcMain.handle(DESKTOP_IPC.localeGet, (event) => {
+    assertDesktopSender(event, ['shell'])
+    return locale
+  })
+  ipcMain.handle(DESKTOP_IPC.setupGet, (event) => {
+    assertDesktopSender(event, ['shell'])
+    return setupState
+  })
+  app.on('window-all-closed', () => {
+    if (seedInstallInProgress) return
+    if (process.platform !== 'darwin') app.quit()
+  })
 
   const startHost = async (projectDir = activeProject): Promise<DesktopHostProcess> => {
     const next = new DesktopHostProcess(resources.node, projectDir, hostInspectPort)
@@ -203,14 +237,43 @@ async function main(): Promise<void> {
     },
   }
 
-  if (development === undefined) {
-    await manager.applyRelease(resources.seed, app.getVersion(), {
-      ...hooks,
-      beforeActivate: async () => {},
-      afterActivate: async () => {},
+  const needsSeedInstall = development === undefined
+    && !manager.matchesPackagedRelease(resources.seed, app.getVersion())
+  if (needsSeedInstall) {
+    seedInstallInProgress = true
+    setupWindow = createWindow(managementPreload, {
+      width: 560,
+      height: 380,
+      minWidth: 480,
+      minHeight: 300,
     })
+    setupWindow.setTitle(messages.setupWindowTitle)
+    setupWindow.once('ready-to-show', () => { setupWindow?.show() })
+    focusPrimaryWindow = () => {
+      const window = setupWindow
+      if (window === undefined || window.isDestroyed()) return
+      if (window.isMinimized()) window.restore()
+      window.show()
+      window.focus()
+    }
+    await setupWindow.loadURL(`${SCHEME}://shell/first-run.html`)
+    publishSetup({ phase: 'verifying' })
   }
+  if (development === undefined) {
+    await manager.applyRelease(
+      resources.seed,
+      app.getVersion(),
+      {
+        ...hooks,
+        beforeActivate: async () => {},
+        afterActivate: async () => {},
+      },
+      (phase) => { publishSetup({ phase }) },
+    )
+  }
+  publishSetup({ phase: 'starting' })
   host = await startHost()
+  seedInstallInProgress = false
 
   const updates = new DesktopUpdateCoordinator(
     publishUpdate,
@@ -222,15 +285,6 @@ async function main(): Promise<void> {
     },
   )
 
-  protocol.handle(SCHEME, (request) => {
-    const url = new URL(request.url)
-    if (url.hostname === 'shell') return serveShellAsset(request)
-    if (url.hostname !== 'app') return Promise.resolve(new Response(null, { status: 404 }))
-    const active = host
-    if (active === undefined) return Promise.resolve(new Response('backend unavailable', { status: 503 }))
-    return active.fetch(request)
-  })
-
   const mutate = async (event: IpcMainInvokeEvent, mutation: Parameters<DesktopProjectManager['mutate']>[0]): Promise<void> => {
     assertDesktopSender(event, ['shell'])
     if (development !== undefined) {
@@ -239,10 +293,6 @@ async function main(): Promise<void> {
     await manager.mutate(mutation, hooks)
     if (mainWindow !== undefined && !mainWindow.isDestroyed()) mainWindow.webContents.reload()
   }
-  ipcMain.handle(DESKTOP_IPC.localeGet, (event) => {
-    assertDesktopSender(event, ['shell'])
-    return locale
-  })
   ipcMain.handle(DESKTOP_IPC.pluginsList, (event) => {
     assertDesktopSender(event, ['shell'])
     if (development !== undefined) return []
@@ -338,20 +388,30 @@ async function main(): Promise<void> {
   const createMainWindow = (): BrowserWindow => {
     const window = createWindow(appPreload)
     mainWindow = window
-    window.once('ready-to-show', () => { if (!window.isDestroyed()) window.show() })
+    window.once('ready-to-show', () => {
+      if (!window.isDestroyed()) window.show()
+      if (setupWindow !== undefined && !setupWindow.isDestroyed()) {
+        setupWindow.close()
+        setupWindow = undefined
+      }
+    })
     window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
     return window
   }
   focusPrimaryWindow = () => {
-    const window = mainWindow
-    if (window === undefined || window.isDestroyed()) {
+    const target = (mainWindow !== undefined && !mainWindow.isDestroyed())
+      ? mainWindow
+      : (setupWindow !== undefined && !setupWindow.isDestroyed())
+        ? setupWindow
+        : undefined
+    if (target === undefined) {
       const replacement = createMainWindow()
       void replacement.loadURL(`${SCHEME}://app/index.html`)
       return
     }
-    if (window.isMinimized()) window.restore()
-    window.show()
-    window.focus()
+    if (target.isMinimized()) target.restore()
+    target.show()
+    target.focus()
   }
 
   mainWindow = createMainWindow()
@@ -364,9 +424,6 @@ async function main(): Promise<void> {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) focusPrimaryWindow()
-  })
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
   })
   app.on('before-quit', (event) => {
     if (shellInstallerOwnsQuit) return
