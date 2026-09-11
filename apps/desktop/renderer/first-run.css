@@ -1,0 +1,34 @@
+.setup {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.setup-card {
+  max-width: 28rem;
+  text-align: center;
+}
+
+.setup-card h1 {
+  margin-bottom: 12px;
+}
+
+.setup-card p {
+  margin-bottom: 12px;
+  color: GrayText;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  margin: 0 auto 1.25rem;
+  border: 3px solid ButtonBorder;
+  border-top-color: AccentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

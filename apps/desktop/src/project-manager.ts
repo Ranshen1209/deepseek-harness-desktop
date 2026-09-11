@@ -6,6 +6,7 @@ import {
   constants,
   copyFileSync,
   cpSync,
+  createReadStream,
   existsSync,
   fsyncSync,
   ftruncateSync,
@@ -49,6 +50,9 @@ export interface DesktopPluginRecord {
   readonly name: string
   readonly version: string
 }
+
+/** First-launch or upgrade phases that consume the packaged seed. */
+export type DesktopReleaseProgressPhase = 'verifying' | 'store' | 'installing' | 'health' | 'activating'
 
 /** Installed desktop project manifest slice. */
 interface DesktopProjectManifest {
@@ -108,9 +112,40 @@ const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/[a-z0-9][a-z0-9._~-]*|
 const VERSION_PATTERN = /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/u
 const MAX_PNPM_DIAGNOSTIC_BYTES = 64 * 1024
 const DESKTOP_REGISTRY = 'https://registry.npmjs.org/'
+const SEED_HASH_CONCURRENCY = 4
 
 function errorOf(reason: unknown, fallback: string): Error {
   return reason instanceof Error ? reason : new Error(fallback)
+}
+
+async function mapLimit<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(concurrency, Math.max(items.length, 1)) }, async () => {
+    for (;;) {
+      const index = next
+      next += 1
+      if (index >= items.length) return
+      results[index] = await mapper(items[index] as T)
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
+async function hashFileSha256(path: string): Promise<{ bytes: number; sha256: string }> {
+  const hash = createHash('sha256')
+  let bytes = 0
+  for await (const chunk of createReadStream(path)) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    bytes += buffer.byteLength
+    hash.update(buffer)
+  }
+  return { bytes, sha256: hash.digest('hex') }
 }
 
 function writeJson(path: string, value: unknown): void {
@@ -203,8 +238,8 @@ function copyMetadata(source: string, target: string): void {
   })
 }
 
-function seedFiles(root: string): readonly DesktopSeedIntegrityRecord[] {
-  const files: DesktopSeedIntegrityRecord[] = []
+function seedFilePaths(root: string): readonly string[] {
+  const files: string[] = []
   const visit = (directory: string): void => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name)
@@ -216,20 +251,18 @@ function seedFiles(root: string): readonly DesktopSeedIntegrityRecord[] {
         continue
       }
       if (!entry.isFile()) throw new Error(`desktop seed: unsupported file type: ${relativePath}`)
-      const body = readFileSync(path)
-      files.push({
-        path: relativePath,
-        bytes: body.byteLength,
-        sha256: createHash('sha256').update(body).digest('hex'),
-      })
+      files.push(path)
     }
   }
   visit(root)
-  return files.sort((left, right) => left.path.localeCompare(right.path))
+  return files.sort((left, right) => left.localeCompare(right))
 }
 
-/** Verify the packaged offline seed before any content enters writable desktop state. */
-export function verifySeedIntegrity(seedDir: string): void {
+/**
+ * Verify the packaged offline seed before any content enters writable desktop state.
+ * @param seedDir - packaged seed directory whose integrity.json inventory will be hashed.
+ */
+export async function verifySeedIntegrity(seedDir: string): Promise<void> {
   const integrityPath = join(seedDir, 'integrity.json')
   const integrity = readJson(integrityPath)
   if (!isRecord(integrity) || integrity.schemaVersion !== 2 || !Array.isArray(integrity.files)) {
@@ -244,7 +277,14 @@ export function verifySeedIntegrity(seedDir: string): void {
     }
     return { path: record.path, bytes: record.bytes, sha256: record.sha256 }
   }).sort((left, right) => left.path.localeCompare(right.path))
-  const actual = seedFiles(seedDir)
+  const actual = (await mapLimit(seedFilePaths(seedDir), SEED_HASH_CONCURRENCY, async (path) => {
+    const hashed = await hashFileSha256(path)
+    return {
+      path: path.slice(seedDir.length + 1).split(sep).join('/'),
+      bytes: hashed.bytes,
+      sha256: hashed.sha256,
+    }
+  })).sort((left, right) => left.path.localeCompare(right.path))
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error('desktop seed: integrity verification failed')
   }
@@ -390,13 +430,46 @@ export class DesktopProjectManager {
     return releaseFile(this.paths.profile).version
   }
 
-  /** Install or reconcile the active project to the Electron package's exact release. */
-  async applyRelease(seedDir: string, electronVersion: string, hooks: DesktopProjectHooks): Promise<boolean> {
+  /**
+   * Return whether the active profile already matches this packaged release.
+   * Does not read store archives or the seed integrity inventory.
+   * @param seedDir - packaged seed directory.
+   * @param electronVersion - Electron application version.
+   * @returns true when the installed profile already has this exact release.
+   */
+  matchesPackagedRelease(seedDir: string, electronVersion: string): boolean {
+    const target = releaseFile(seedDir)
+    if (target.version !== electronVersion) {
+      throw new Error(`desktop project: seed ${target.version} does not match Electron ${electronVersion}`)
+    }
+    if (!existsSync(this.paths.profile)) return false
+    try {
+      return this.releaseVersion() === target.version
+        && this.dshVersion() === target.version
+        && this.installedPackageVersion(DESKTOP_HOST_PACKAGE) === target.version
+    } catch {
+      // Missing or unreadable installed package metadata cannot prove a matching release.
+      return false
+    }
+  }
+
+  /**
+   * Install or reconcile the active project to the Electron package's exact release.
+   * @param seedDir - packaged seed directory.
+   * @param electronVersion - Electron application version.
+   * @param hooks - backend lifecycle hooks for health checking and activation.
+   * @param onProgress - optional first-run or upgrade progress reporter.
+   * @returns true when the seed was installed or reconciled, false when the active profile already matched.
+   */
+  async applyRelease(
+    seedDir: string,
+    electronVersion: string,
+    hooks: DesktopProjectHooks,
+    onProgress?: (phase: DesktopReleaseProgressPhase) => void,
+  ): Promise<boolean> {
     return this.withLock(async () => {
       this.recover()
-      verifySeedIntegrity(seedDir)
       const target = releaseFile(seedDir)
-      verifyDesktopCorePackageSet(seedDir, target.version)
       if (target.version !== electronVersion) {
         throw new Error(`desktop project: seed ${target.version} does not match Electron ${electronVersion}`)
       }
@@ -406,12 +479,17 @@ export class DesktopProjectManager {
         verifyDesktopCorePackageSet(this.paths.profile, target.version)
         return false
       }
-      this.mergeSeedPnpmState(seedDir)
+      onProgress?.('verifying')
+      await verifySeedIntegrity(seedDir)
+      verifyDesktopCorePackageSet(seedDir, target.version)
+      onProgress?.('store')
+      await this.mergeSeedPnpmState(seedDir)
       const stagingProfile = this.newStagingProfile()
       try {
         if (existsSync(this.paths.profile)) {
           const plugins = pluginRecords(this.paths.profile)
           copyMetadata(seedDir, stagingProfile)
+          onProgress?.('installing')
           await this.runPnpm(stagingProfile, ['install', '--offline', '--frozen-lockfile', '--trust-lockfile'])
           if (plugins.length > 0) {
             await this.runPnpm(stagingProfile, [
@@ -424,9 +502,12 @@ export class DesktopProjectManager {
           }
         } else {
           copyMetadata(seedDir, stagingProfile)
+          onProgress?.('installing')
           await this.runPnpm(stagingProfile, ['install', '--offline', '--frozen-lockfile', '--trust-lockfile'])
         }
+        onProgress?.('health')
         await hooks.healthCheck(stagingProfile)
+        onProgress?.('activating')
         await this.activate(stagingProfile, hooks)
         return true
       } catch (error) {
@@ -505,12 +586,12 @@ export class DesktopProjectManager {
     }
   }
 
-  private mergeSeedPnpmState(seedDir: string): void {
+  private async mergeSeedPnpmState(seedDir: string): Promise<void> {
     const transactionRoot = join(this.paths.staging, randomUUID())
     const extractedStore = join(transactionRoot, 'store')
     try {
-      extractPnpmStoreArchives(seedDir, extractedStore)
-      mergePnpmStore(extractedStore, this.paths.pnpm.store)
+      await extractPnpmStoreArchives(seedDir, extractedStore)
+      await mergePnpmStore(extractedStore, this.paths.pnpm.store)
     } finally {
       removeOwnedDirectory(transactionRoot)
     }

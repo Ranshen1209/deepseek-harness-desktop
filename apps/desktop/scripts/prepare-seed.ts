@@ -181,7 +181,7 @@ async function main(): Promise<void> {
     if (!unsigned && macOSSigning !== undefined && signedMachOFiles !== undefined) {
       const extractedStore = mkdtempSync(join(tmpdir(), 'dsh-desktop-seed-verification-'))
       try {
-        extractPnpmStoreArchives(SEED_ROOT, extractedStore)
+        await extractPnpmStoreArchives(SEED_ROOT, extractedStore)
         const verified = verifyMacOSSeedStore(extractedStore, macOSSigning)
         if (verified !== signedMachOFiles) {
           throw new Error(`desktop seed: archived store contains ${verified} signed Mach-O files; expected ${signedMachOFiles}`)

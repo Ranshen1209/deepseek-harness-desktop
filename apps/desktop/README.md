@@ -23,9 +23,9 @@ The [Electron packaging and update Agent Note](../../.agents/notes/implemented/a
 
 Electron owns the reserved profile at `$DSH_HOME/profiles/desktop`. Its manifest lists the built-in and installed plugin bundles in `dsh.profile.bundles`, while its `node_modules` contains the exact `@deepseek-ai/dsh` release, its matching private `@deepseek-ai/dsh-desktop-host`, and every desktop plugin. Keeping the Electron-only process entry and overlay in a private app package prevents Desktop implementation from becoming part of the public CLI package. The CLI cannot boot or mutate this profile. Electron always invokes its bundled Node.js and pnpm with the store at `$DSH_HOME/desktop/pnpm/store`; it never uses system pnpm or the caller's npm/pnpm configuration.
 
-The main dsh renderer receives only the desktop protocol marker. The separate plugin window receives structured list, install, remove, update, and update-check operations; neither renderer receives filesystem access, raw Electron IPC, a shell, or arbitrary pnpm arguments.
+The main dsh renderer receives only the desktop protocol marker. The first-run window receives locale and setup progress; the plugin window receives structured list, install, remove, update, and update-check operations. Neither renderer receives filesystem access, raw Electron IPC, a shell, or arbitrary pnpm arguments.
 
-Electron chooses typed English or Chinese shell copy from its application locale and falls back to English. Menus, native dialogs, and the plugin-management renderer use the same locale payload; Windows menu commands use complete labels without ellipses unless the command needs additional user input; the repository Client UI i18n gate checks these desktop sources.
+Electron chooses typed English or Chinese shell copy from its application locale and falls back to English. Menus, native dialogs, the first-run renderer, and the plugin-management renderer use the same locale payload; Windows menu commands use complete labels without ellipses unless the command needs additional user input; the repository Client UI i18n gate checks these desktop sources.
 
 ### Seed installation
 
@@ -34,17 +34,17 @@ The packaged seed is an installation kit, not a ready-to-run `node_modules` tree
 | Seed content | Writable destination or use |
 |---|---|
 | `integrity.json` and `desktop-packages.json` | Verify every inventoried seed file, local tarball hash, and the bound dsh and Desktop Host versions before package state changes. |
-| `store-archives.json` and `store-archives/*.tar` | Validate the deterministic uncompressed shards, extract them into a unique Desktop staging directory, replace matching immutable store files, and transactionally merge pnpm's versioned SQLite package index into `$DSH_HOME/desktop/pnpm/store` without removing packages already downloaded for Desktop plugins. |
+| `store-archives.json` and `store-archives/*.tar` | Validate the deterministic uncompressed shards while extracting them into a unique Desktop staging directory. When the private store is empty, move that directory into `$DSH_HOME/desktop/pnpm/store`; otherwise replace matching immutable store files and transactionally merge pnpm's versioned SQLite package index without removing packages already downloaded for Desktop plugins. |
 | Project metadata and `desktop-packages/` | Copy into a unique `$DSH_HOME/desktop/staging/<transaction-id>/profile` project. |
 | Lockfile and local package mappings | Drive the bundled pnpm installation without resolving a packaged core name from npm. |
 
 Startup installs or reconciles the seed as one serialized transaction:
 
-1. Recover an interrupted activation journal, verify the complete seed inventory and local package set, and require the seed version to equal Electron's application version.
-2. If the active profile already contains that release plus the matching dsh and Desktop Host versions, verify its local package set and reuse it without reinstalling.
-3. Otherwise validate every archive entry, extract all store shards into a temporary Desktop-owned staging directory, merge the package files and SQLite package-index records into the private store, create a staging profile, and run `pnpm install --offline --frozen-lockfile --trust-lockfile` through the bundled Node.js and pnpm. Seed records replace matching index keys while plugin-only records remain available.
+1. Recover an interrupted activation journal and require the seed version to equal Electron's application version.
+2. If the active profile already contains that release plus the matching dsh and Desktop Host versions, verify its local package set and reuse it without hashing the seed inventory or reading store archives.
+3. Otherwise open a locale-owned progress window, verify the complete seed inventory and local package set, validate every archive entry while extracting all store shards into a temporary Desktop-owned staging directory, move that directory into the private store when the store is empty or merge package files and SQLite package-index records when it is not, create a staging profile, and run `pnpm install --offline --frozen-lockfile --trust-lockfile` through the bundled Node.js and pnpm. Seed records replace matching index keys while plugin-only records remain available.
 4. During an Electron upgrade, read every plugin name and exact version from the old active profile and add those versions to staging with `--offline` from existing Desktop pnpm state. A first installation has no plugin-restore step.
-5. Stop the active backend, boot and stop the complete staged backend as a health check, then restart the active backend before activation. This serialization prevents two desktop backends from sharing `$DSH_HOME`; installation or plugin incompatibility before activation deletes staging and leaves the active profile unchanged.
+5. Stop the active backend, boot and stop the complete staged backend as a health check, then restart the active backend before activation. This serialization prevents two desktop backends from sharing `$DSH_HOME`; installation or plugin incompatibility before activation deletes staging and leaves the active profile unchanged. The progress window stays visible until the product backend is ready.
 6. Persist each next activation phase before its directory move, move the active profile to `$DSH_HOME/desktop/rollback/profile`, and move staging into `$DSH_HOME/profiles/desktop`. Recovery combines the journal with the actual profile, rollback, and staging directories, so interruption in either write-to-move gap restores or retains a complete profile.
 
 GUI plugin mutations use the same staging, health-check, activation, and rollback path after installing registry packages into the shared Desktop pnpm store.
