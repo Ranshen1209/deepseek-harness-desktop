@@ -1,0 +1,6 @@
+{
+  "name": "DeepSeek Harness",
+  "install": "export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; nvm use 22 >/dev/null || nvm install 22; export CI=true; pnpm install --frozen-lockfile && pnpm run build",
+  "start": "export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; nvm use 22 >/dev/null; export CI=true; pnpm dsh web --no-open --host 127.0.0.1 --port 3080",
+  "ports": [{ "name": "dsh web", "port": 3080 }]
+}
