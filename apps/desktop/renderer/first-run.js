@@ -11,8 +11,8 @@ async function main() {
   const locale = await api.locale()
   const messages = locale.messages
   document.documentElement.lang = locale.id
-  for (const [id, key] of Object.entries({ 'page-title': 'setupWindowTitle', title: 'setupTitle', description: 'setupDescription',
-    footnote: 'setupFootnote', interaction: 'setupInteraction', 'step-verify': 'setupStepVerify', 'step-prepare': 'setupStepPrepare', 'step-open': 'setupStepOpen' })) {
+  for (const [id, key] of Object.entries({ 'page-title': 'setupWindowTitle', title: 'setupTitle',
+    footnote: 'setupFootnote', 'step-verify': 'setupStepVerify', 'step-prepare': 'setupStepPrepare', 'step-open': 'setupStepOpen' })) {
     document.getElementById(id).textContent = messages[key]
   }
   const status = document.querySelector('#status')

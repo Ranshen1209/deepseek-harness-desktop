@@ -46,10 +46,8 @@ try {
     await page.goto(`http://127.0.0.1:${address.port}/first-run.html`)
     await page.waitForFunction(() => document.querySelector('#status')?.textContent !== '')
     const expected = JSON.parse(readFileSync(new URL(`./expected/first-run-${language}.json`, import.meta.url), 'utf8')) as
-      Record<'title' | 'description' | 'interaction' | 'verifying' | 'installing' | 'starting' | 'ready', string>
+      Record<'title' | 'verifying' | 'installing' | 'starting' | 'ready', string>
     assert.equal(await page.locator('h1').textContent(), expected.title)
-    assert.equal(await page.locator('#description').textContent(), expected.description)
-    assert.equal(await page.locator('#interaction').textContent(), expected.interaction)
     assert.equal(await page.locator('#status').textContent(), expected.verifying)
     assert.equal(await page.locator('#progress').getAttribute('value'), null)
     await page.evaluate(() => { (globalThis as unknown as { emitSetup: (state: DesktopSetupState) => void }).emitSetup({ phase: 'installing', completedBytes: 65, totalBytes: 100 }) })
