@@ -1,4 +1,4 @@
-# Agent Note: Windows Explorer reveal uses `/select,<path>` as one argument
+# Agent Note: Windows Explorer reveal preserves visibility and quoted paths
 
 Status: implemented
 
@@ -6,22 +6,22 @@ English | [中文](2026-09-11-windows-explorer-select-path.zh.md)
 
 ## Problem
 
-The delivery-card action “Show in File Explorer” / “在文件资源管理器中显示” does nothing on Windows. “Open in default app” on the same menu still works. macOS Reveal in Finder is unaffected.
+The delivery-card action “Show in File Explorer” does nothing on Windows while “Open in default app” works. Native observation shows that direct `execFile` with `windowsHide: true` hides even a correctly selected window. Automatic quoting around the entire `/select,<path>` argument also prevents paths with spaces or commas from being selected; forward-slash paths fail too. Explorer exit 1 cannot distinguish these failures from a successful handoff.
 
 ## Decision
 
-[`revealNativePath`](../../../../packages/util/native-command/src/path-opener.ts) launches `explorer.exe` with one argv element `/select,<windows-path>`. WSL still translates through `wslpath -w` first. Explorer's `/select` switch takes a Windows filesystem path immediately after the comma; `CreateProcess` joining `/select,` and the path as two arguments inserts a space, and a `file://` URI is not a valid `/select` object. Either form can exit 1, which this function already treats as a delegated handoff, so the Host reports success while Explorer shows nothing. Default-app open stays on PowerShell `Invoke-Item`. Missing files still fail at the present-open Host path check before this launch, matching Finder's refusal of a missing target.
+[`revealNativePath`](../../../../packages/util/native-command/src/path-opener.ts) uses PowerShell `Start-Process` to hand Explorer one `/select,"<windows-path>"` argument string. The shared runner hides the PowerShell console while Explorer remains visible. Windows separators and quotes around the path preserve spaces and commas. A PowerShell single-quoted literal with doubled apostrophes prevents evaluation of filename contents. WSL translates through `wslpath -w` before the same Windows handoff. PowerShell launcher failures reject, including exit 1; successful launch acknowledges an asynchronous desktop request.
+
+Default-app opening remains on `Invoke-Item`. The present-open Host path check rejects missing targets before launch. macOS and desktop Linux retain their existing file-manager commands.
 
 ## Alternatives considered
 
-**Keep a `file://` URI as a second argument.** That encoding was meant to survive commas in the path. Explorer does not treat a file URI as a `/select` object, so every reveal fails, including paths without commas.
+**Direct `execFile` with `windowsHide: false` and `windowsVerbatimArguments`.** Native Windows selection works when the path alone is quoted, but this extends the shared runner and requires a separate WSL interop policy. PowerShell is already required by Windows default-app opening and accepts the same literal argument string from both Hosts.
 
-**Quote `/select,"<path>"` or set `windowsVerbatimArguments`.** Extra quotes inside one `execFile` argument are re-escaped by libuv; verbatim command lines would special-case the shared runner. The unquoted `/select,<path>` form is what Node spawn produces for ordinary Windows paths and is what Explorer parses after the comma, including spaces.
+**A `file://` URI or a separate path argument.** URI encoding was intended to preserve commas, but Explorer does not accept a file URI as its `/select` object. Splitting the switch and path inserts whitespace outside the path quotes. One `Start-Process -ArgumentList` string preserves the switch, comma, and path quotes.
 
-**Route Desktop reveals through Electron `shell.showItemInFolder`.** That API uses `SHOpenFolderAndSelectItems` and would leave CLI and non-Electron Hosts on the broken argv. The Host opener is the shared path.
-
-**Reveal through PowerShell `Start-Process`.** Default-app open already uses PowerShell, but `Start-Process -ArgumentList` splits on spaces unless wrapped as a one-element array, and PowerShell's native call syntax treats commas as argument separators. Direct `explorer.exe` avoids that parser.
+**Electron `shell.showItemInFolder`.** Its native `SHOpenFolderAndSelectItems` integration fixes only the Electron path. Keeping the fix in the Host opener also covers CLI and non-Electron Hosts.
 
 ## Consequences
 
-Injected-runner tests pin Darwin `open -R`, Linux `xdg-open` of the parent, WSL translation plus `/select,<windows-path>`, and the one-argument Explorer form for spaces, non-ASCII names, `#`, `%`, and UNC paths. Native window selection still belongs to a Windows desktop; this acknowledgement is not proof that Explorer selected the file. Explorer's own comma delimiter remains: a comma in the path can still truncate the `/select` object. That case is not re-encoded as a URI.
+Injected-runner tests cover platform dispatch, WSL translation, Windows and UNC literals, launcher errors, and cancellation. The [interactive Windows smoke](../../../../packages/util/native-command/tests/reveal.windows.e2e.ts) observes visible windows and selected files for ordinary paths, Chinese names, spaces, commas, apostrophes, metacharacters, and forward slashes. It resolves temporary 8.3 paths before comparing Explorer's expanded paths and closes only its own windows. Live WSL and network-share selection remain environment-owned verification gaps. The operation waits for launcher acknowledgement, not the lifetime of Explorer.

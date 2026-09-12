@@ -47,7 +47,9 @@ const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], s
 
 `openNativePath(path, signal)` 将路径交给默认应用；平台能够确定默认浏览器时，HTML 与 SVG 会优先交给该浏览器。`openNativeTextFile(path, signal)` 选择文本编辑器意图；macOS 使用 `open -t`。WSL 路径先通过 `wslpath -w` 转换，再交给 Windows 桌面。`canOpenNativePath()` 报告当前 Host 是否可能具备桌面目标。
 
-`revealNativePath(path, signal)` 在 Finder 或文件资源管理器中选中文件，包含 WSL 路径转换；在桌面 Linux 上通过 `xdg-open` 打开上层目录。`nativeFileManager()` 标识该操作，供 UI 根据 Host 选择文案；桌面是否可用仍由独立的 `canOpenNativePath()` 检查决定。调用方必须先授权绝对文件路径，再执行操作。平台分派由注入运行器的测试覆盖；原生桌面验证由对应平台负责。 Explorer 接收单个参数 `/select,<windows-path>`。退出码 1 按已转交请求处理；取消、找不到可执行文件和其他退出码仍然报错。该确认不能证明桌面窗口已选中文件。
+`revealNativePath(path, signal)` 在 Finder 或文件资源管理器中选中文件，包含 WSL 路径转换；在桌面 Linux 上通过 `xdg-open` 打开上层目录。`nativeFileManager()` 标识该操作，供 UI 根据 Host 选择文案；桌面是否可用仍由独立的 `canOpenNativePath()` 检查决定。调用方必须先授权绝对文件路径，再执行操作。Windows 通过 PowerShell `Start-Process` 传递单个 `/select,"<windows-path>"` 参数字符串：资源管理器保持可见，辅助控制台保持隐藏。路径使用 Windows 分隔符并按字面值引用，支持空格、逗号、单引号和非 ASCII 名称。启动器失败和取消会报错；成功转交请求不会同步确认桌面选中状态。
+
+在交互式 Windows 桌面上，从仓库根目录运行 `node --experimental-strip-types packages/util/native-command/tests/reveal.windows.e2e.ts`，通过真实文件验证资源管理器可见且正确选中目标。验证只关闭自身目录的窗口并删除临时文件。可选的第一个参数为构建模块的导入 URL，第二个参数为证据输出目录。WSL 转换和 UNC 参数保留由注入运行器测试覆盖；真实 WSL 与网络共享选中行为需要相应环境验证。
 
 -----
 

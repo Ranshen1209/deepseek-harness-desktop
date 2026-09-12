@@ -10,7 +10,7 @@
  */
 
 import { release as osRelease } from 'node:os'
-import { dirname, extname } from 'node:path'
+import { dirname, extname, win32 } from 'node:path'
 import { runNativeCommand, type NativeCommandRunner } from './runner.ts'
 
 /** Testable command boundary; native implementations never invoke a shell. */
@@ -219,11 +219,11 @@ export function nativeFileManager(internals: PathOpenerInternals = {}): NativeFi
 
 /**
  * Reveal a file in Finder or Explorer, or open its parent in the Linux default file manager.
- * Explorer receives one argv element `/select,<windows-path>`.
+ * PowerShell starts a visible Explorer window with the quoted Windows selection path.
  * @param path - absolute file path already authorized by the caller.
  * @param signal - caller lifetime; abort terminates the native command.
  * @param internals - platform, environment, and command runner for adapter tests.
- * @returns after command completion; Explorer exit 1 is accepted as a delegated handoff, not proof of selection.
+ * @returns after the launcher accepts the request; desktop selection is asynchronous.
  */
 export async function revealNativePath(
   path: string, signal: AbortSignal, internals: PathOpenerInternals = {},
@@ -244,14 +244,13 @@ export async function revealNativePath(
       windowsPath = translated.stdout.replace(/[\r\n]+$/, '')
       if (windowsPath === '') throw new Error('wslpath returned no Windows path')
     }
-    try {
-      // `/select,<path>` must stay one argv element; a following space makes Explorer ignore the path.
-      await run('explorer.exe', [`/select,${windowsPath}`], signal)
-    } catch (error) {
-      signal.throwIfAborted()
-      // Explorer can exit 1 after delegating to the existing desktop process.
-      if (!(error instanceof Error) || !('code' in error) || error.code !== 1) throw error
-    }
+    // Start-Process preserves Explorer's inner path quotes and keeps windowsHide on the console only.
+    const argument = `/select,"${win32.normalize(windowsPath)}"`
+    await run('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `$ErrorActionPreference = 'Stop'; Start-Process -FilePath explorer.exe -ArgumentList ${powershellLiteral(argument)}`,
+    ], signal)
+    signal.throwIfAborted()
     return
   }
   if (manager === 'directory') {
