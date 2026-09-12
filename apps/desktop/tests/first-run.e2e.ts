@@ -56,6 +56,7 @@ try {
     assert.equal(await page.locator('#status').textContent(), expected.installing)
     assert.equal(await page.locator('#progress').getAttribute('value'), '65')
     await page.waitForFunction(() => document.body.classList.contains('assembled'))
+    assert.equal(await page.locator('#logo').evaluate(element => getComputedStyle(element).opacity), '0', 'the animated whale must contain particles only')
     if (output !== undefined) {
       await mkdir(output, { recursive: true })
       await page.screenshot({ path: join(output, `first-run-${language}.png`) })
