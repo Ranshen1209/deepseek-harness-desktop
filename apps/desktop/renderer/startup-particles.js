@@ -46,8 +46,8 @@ export function startParticles() {
     return { kind, homeX, homeY, radius, phase: Math.random() * tau,
       x: 0, y: 0, offsetX: 0, offsetY: 0,
       vx: 0, vy: 0, size: .45 + Math.random() * (kind === 'logo' ? .8 : 1.1),
-      color: kind === 'logo' ? 1 : index % colors.length,
-      glow: kind !== 'logo' && index % 17 === 0,
+      color: kind === 'logo' ? (index % 5 === 0 ? 3 : index % 2) : index % colors.length,
+      glow: index % (kind === 'logo' ? 13 : 17) === 0,
       lane: index % 10 < 6 ? 0 : index % 10 < 9 ? 1 : 2,
       haze: kind === 'cloud' && index % 47 === 0 }
   }
@@ -198,11 +198,9 @@ export function startParticles() {
       if (p.kind === 'logo') {
         x = centerX + p.homeX * logoWidth + pointer.tiltX * 7 + Math.sin(time * 1.6 + p.homeY * 10) * 1.2
         y = centerY + p.homeY * logoHeight + pointer.tiltY * 5 + Math.cos(time * 1.4 + p.homeX * 8) * 1.2
-        const sweep = (time - .25) / 1.05 * 1.55 - .8
-        const position = p.homeX - p.homeY * .3
-        const lit = Math.min(1, Math.max(0, (sweep - position) / .16))
-        const reveal = p.edge ? Math.max(lit, Math.min(1, time / .5)) : lit
-        alpha = .6 * reveal
+        const progress = Math.min(1, Math.max(0, (time - (p.edge ? 0 : .18)) / (p.edge ? .55 : .85)))
+        const reveal = progress * progress * (3 - 2 * progress)
+        alpha = reveal * (.56 + Math.sin(time * 1.4 + p.phase) * .16)
       } else if (p.kind === 'cloud') {
         const u = p.homeX
         const flow = time * .11
@@ -242,7 +240,7 @@ export function startParticles() {
           const force = (1 - distance / 125) ** 2 * 2.8
           p.vx += (dx - dy * .45) / distance * force * dt
           p.vy += (dy + dx * .45) / distance * force * dt
-          if (p.kind !== 'logo') alpha = Math.min(1, alpha + force * .24)
+          alpha = Math.min(1, alpha + force * .24)
         }
       }
       const damping = Math.pow(.84, dt)
@@ -252,8 +250,7 @@ export function startParticles() {
       p.offsetY += p.vy * dt
       p.x = x + p.offsetX
       p.y = y + p.offsetY
-      context.globalCompositeOperation = p.kind === 'logo' ? 'source-over' : 'lighter'
-      paint(p, Math.min(1, alpha) * entrance * (p.y > centerY + logoHeight * .7 ? .48 : 1), 10)
+      paint(p, Math.min(1, alpha) * entrance * (p.y > centerY + logoHeight * .7 ? .48 : 1), p.kind === 'logo' ? 7 : 10)
     }
     context.globalCompositeOperation = 'lighter'
     drift(trails, dt, .035)
