@@ -135,6 +135,8 @@ async function serveShellAsset(request: Request): Promise<Response> {
 }
 
 async function main(): Promise<void> {
+  const startupAt = performance.now()
+  const timings: Array<{ phase: string; elapsedMs: number }> = []
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   const development = developmentProject()
@@ -163,6 +165,9 @@ async function main(): Promise<void> {
     return state
   }
   const publishSetup = (state: DesktopSetupState): DesktopSetupState => {
+    if (timings.at(-1)?.phase !== state.phase) {
+      timings.push({ phase: state.phase, elapsedMs: Math.round(performance.now() - startupAt) })
+    }
     setupState = state
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(DESKTOP_IPC.setupState, state)
@@ -193,7 +198,12 @@ async function main(): Promise<void> {
 
   const startHost = async (projectDir = activeProject): Promise<DesktopHostProcess> => {
     const next = new DesktopHostProcess(resources.node, projectDir, hostInspectPort)
-    await next.start()
+    try {
+      await next.start()
+    } catch (error) {
+      await next.stop()
+      throw error
+    }
     return next
   }
   const hooks: DesktopProjectHooks = {
@@ -233,6 +243,7 @@ async function main(): Promise<void> {
       await active?.stop()
     },
     afterActivate: async () => {
+      publishSetup({ phase: 'starting' })
       host = await startHost()
     },
   }
@@ -242,11 +253,17 @@ async function main(): Promise<void> {
   if (needsSeedInstall) {
     seedInstallInProgress = true
     setupWindow = createWindow(managementPreload, {
-      width: 560,
-      height: 380,
+      width: 640,
+      height: 460,
       minWidth: 480,
       minHeight: 300,
+      resizable: false,
+      maximizable: false,
+      backgroundColor: '#070d20',
+      titleBarStyle: 'hidden',
+      ...(process.platform === 'win32' ? { titleBarOverlay: { color: '#070d20', symbolColor: '#b6c9f0', height: 32 } } : {}),
     })
+    setupWindow.setMenu(null)
     setupWindow.setTitle(messages.setupWindowTitle)
     setupWindow.once('ready-to-show', () => { setupWindow?.show() })
     focusPrimaryWindow = () => {
@@ -260,19 +277,23 @@ async function main(): Promise<void> {
     publishSetup({ phase: 'verifying' })
   }
   if (development === undefined) {
-    await manager.applyRelease(
-      resources.seed,
-      app.getVersion(),
-      {
-        ...hooks,
-        beforeActivate: async () => {},
-        afterActivate: async () => {},
-      },
-      (phase) => { publishSetup({ phase }) },
-    )
+    // Deployment only accesses real files; the setup assets have finished loading.
+    // Avoid Electron's archive-path probing on every dependency filesystem operation.
+    const previousNoAsar = process.noAsar
+    process.noAsar = true
+    try {
+      await manager.applyRelease(
+        resources.seed,
+        app.getVersion(),
+        hooks,
+        (phase, progress) => { publishSetup({ phase, ...progress }) },
+      )
+    } finally {
+      process.noAsar = previousNoAsar
+    }
   }
   publishSetup({ phase: 'starting' })
-  host = await startHost()
+  host ??= await startHost()
   seedInstallInProgress = false
 
   const updates = new DesktopUpdateCoordinator(
@@ -389,11 +410,13 @@ async function main(): Promise<void> {
     const window = createWindow(appPreload)
     mainWindow = window
     window.once('ready-to-show', () => {
+      publishSetup({ phase: 'ready' })
       if (!window.isDestroyed()) window.show()
       if (setupWindow !== undefined && !setupWindow.isDestroyed()) {
         setupWindow.close()
         setupWindow = undefined
       }
+      console.info(`desktop startup: ${JSON.stringify({ version: app.getVersion(), initialSetup: needsSeedInstall, timings })}`)
     })
     window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
     return window

@@ -29,27 +29,27 @@ Electron 根据应用 locale 选择类型化的中英文字典，并以英文作
 
 ### Seed 安装
 
-安装包内的 seed 是安装工具包，不是可以直接运行的 `node_modules` 目录。打包过程会生成锁文件，在禁用生命周期脚本的情况下在线物化生产依赖图，删除 `node_modules` 以及所有临时 pnpm cache、config 和 state 目录，然后只使用最终 store 完成一次完整离线安装，并验证私有 Desktop Host 的入口与 overlay 均存在。macOS 构建随后从 pnpm 内容寻址 store staging 每个 Mach-O 对象，最多并发四个 Developer ID 签名进程，并且只在所有签名成功后才更新受影响的 SHA-512 索引记录。再一次离线安装会在分片前证明重写后的 store；准备过程随后解包最终归档，并验证每个内嵌签名。签名 seed 保留发布身份、本地第一方 tarball 及其描述文件、项目元数据、锁文件、完整性清单，以及在用户机器上重复该安装所需的 pnpm store 内容。
+发布包同时携带针对目标平台预构建的运行包和离线维护 seed。打包从最终验证过的平铺安装生成运行包；签名 macOS 构建先完成原生文件签名。相对链接只能指向依赖树内部文件；与构建机绑定的 pnpm 元数据、外部链接和目录链接被排除或拒绝。[运行包决策](../../.agents/notes/implemented/architecture/2026-09-11-desktop-runtime-image.zh.md)负责启动和恢复机制的取舍。
 
 | Seed 内容 | 可写目标或用途 |
 |---|---|
-| `integrity.json` 与 `desktop-packages.json` | 在修改包状态前验证清单记录的每个 seed 文件、本地 tarball 哈希以及绑定的 dsh 与 Desktop Host 版本。 |
-| `store-archives.json` 与 `store-archives/*.tar` | 在解包到唯一 Desktop staging 目录的同时验证确定性的未压缩分片。私有 store 为空时，把该目录移入 `$DSH_HOME/desktop/pnpm/store`；否则替换匹配的不可变 store 文件，并以事务方式合并 pnpm 的版本化 SQLite 包索引，且不移除已经为 Desktop 插件下载的包。 |
-| 项目元数据与 `desktop-packages/` | 复制到唯一的 `$DSH_HOME/desktop/staging/<transaction-id>/profile` 项目。 |
-| 锁文件与本地包映射 | 驱动内置 pnpm 完成安装，且不会从 npm 解析已打包的核心包名。 |
+| `integrity.json` 与 `desktop-packages.json` | 验证所选部署路径所需的元数据和本地包映射。 |
+| `runtime-image.json` 与 `runtime-image.tar` | 绑定发布版本、平台、架构、条目数、字节数和 SHA-256；在一次读取中哈希并解包依赖树到隔离 staging。 |
+| `store-archives.json` 与 `store-archives/*.tar` | 通过私有 pnpm store 恢复包含已安装插件的升级；无插件部署不读取这些分片。 |
+| 项目元数据、锁文件与 `desktop-packages/` | 保留插件操作使用的可写 profile 和本地核心包映射。 |
 
-启动过程把 seed 安装或校准为一个串行事务：
+启动以一个串行事务部署或校准发布：
 
-1. 恢复中断的激活事务日志，并要求 seed 版本等于 Electron 应用版本。
-2. 如果活跃 profile 已包含该发布及匹配的 dsh 与 Desktop Host 版本，则验证其中的本地包集并直接复用，不哈希 seed 清单，也不读取 store 归档。
-3. 否则打开由 locale 提供文案的进度窗口，验证完整 seed 清单与本地包集，在把全部 store 分片解包到 Desktop 拥有的临时 staging 目录的同时验证每个归档条目，store 为空时把该目录移入私有 store，否则合并包文件与 SQLite 包索引记录，再创建 staging profile，并通过内置 Node.js 与 pnpm 执行 `pnpm install --offline --frozen-lockfile --trust-lockfile`。Seed 记录替换匹配的索引键，插件专属记录继续保留。
-4. Electron 升级时，从旧活跃 profile 读取每个插件的名称和精确版本，再通过现有 Desktop pnpm 状态以 `--offline` 把这些版本加入 staging。首次安装不执行插件恢复。
-5. 停止活跃后端，启动并停止完整的 staging 后端执行健康检查，再在激活前重新启动活跃后端。这种串行方式避免两个桌面后端共享 `$DSH_HOME`；安装错误或插件不兼容会删除 staging，并保持活跃 profile 不变。进度窗口会一直显示到产品后端就绪。
-6. 在每次目录移动前先持久化下一个激活阶段，把活跃 profile 移到 `$DSH_HOME/desktop/rollback/profile`，再把 staging 移到 `$DSH_HOME/profiles/desktop`。恢复过程同时检查日志与真实的 profile、rollback 和 staging 目录，因此在任一个写入与移动间隙中断后仍会恢复或保留一个完整 profile。
+1. 恢复中断的激活日志，并要求 seed 版本等于 Electron 应用版本。
+2. 已安装 profile 与发布匹配时，验证本地包集后复用，不读取 seed 归档。
+3. 没有插件的 profile 验证元数据、复制 profile 元数据，并在校验字节的同时解包运行包；该路径不运行 pnpm，也不填充其 store。
+4. 已有插件的升级验证完整 seed、解包并合并 store、在 staging 离线安装，再恢复每个已记录的精确插件版本。插件专属缓存记录继续保留。
+5. 首次安装登记初始激活日志，在最终路径启动一次后端；就绪成功才提交，失败则删除该安装。恢复过程丢弃尚未提交就绪的初始激活。替换现有 profile 在使用新后端前仍保留 staging 健康检查和回滚。
+6. 后端和页面就绪后立即显示产品窗口。准备页通过 DeepSeek 粒子、本地化阶段和实际读取字节呈现进度，不设置最短动画时长；减少动态效果偏好会关闭动画，隐藏页面停止绘制。
 
-GUI 插件修改会在把 registry 包安装到共享 Desktop pnpm store 后，使用相同的 staging、健康检查、激活与 rollback 路径。
+原生打包会在隔离 home 中部署运行包、启动后端并验证客户端文档，之后才生成安装器。目标目录内的 `runtime-smoke.json` 记录该构建机的阶段耗时、一次后端启动和零次 pnpm 调用。`pnpm --filter @deepseek-ai/dsh-desktop run test:ui` 检查两种语言、进度、小窗口布局、减少动态效果和清理；Windows 使用 Edge，其他平台使用已安装的 Playwright Chromium。
 
-进程生命周期 Electron 锁是桌面端的主要 owner。事务锁用于纵深防御：准备本地状态时记录 Electron，在 pnpm worker 仍可能写入时记录该 worker，worker 退出后再把 owner 交还 Electron。后续进程不会把仍然存活的孤儿 worker 误判为陈旧事务。
+Electron 生命周期锁拥有 profile。包事务锁在本地准备时记录 Electron，在 pnpm worker 仍可能写入时记录该 worker。插件变更保留 staging、健康检查、激活和回滚路径。
 
 ## 开发
 
@@ -180,7 +180,7 @@ pnpm run prepare:desktop
 
 每条打包命令都会先执行仓库的正式构建，打包 dsh 与 vendored 包族，在本地打包私有 Desktop Host 包，并打包 Landlock 入口，然后再准备发布资源。`prepare:packages` 选择分别以 `@deepseek-ai/dsh` 和 `@deepseek-ai/dsh-desktop-host` 为根的第一方生产依赖闭包之并集，验证私有 Host tarball 同时包含 `lib/index.js` 与 `config/desktop.cordis.patch.yml`，把选中的 tarball 复制到 seed 输入，并记录其大小与 SHA-512 完整性。Host 包不会发布到 npm；它的 `files` manifest 只包含该运行入口与 overlay。公共包 tarball 仍是由各包发布 manifest 控制的正式 `pnpm pack` 输出，因此 Desktop 不增加第二套过滤规则，会保留 `lib/types` 等已发布声明，也不会独立删除或增加 source map。Registry 包同样在 pnpm 内容寻址 store 中保留其发布的包字节。dsh 发布版本更新会同步更新两个私有 Desktop manifest、仓库根与可发布 workspace；打包还会要求根 dsh 包、Desktop Host 包与 Electron 包使用同一版本。构建 Desktop 应用前不要求 dsh 或私有 Host 已发布到 npm。`prepare:runtime` 从 Node.js 官方发行服务下载 Node.js 24.17.0，在解压前验证其 SHA-256 条目，并在兼容的构建宿主上执行准备完成的目标二进制文件以验证其报告版本。它复制桌面包声明的 pnpm 版本，并把两个运行时版本记录进发布 seed。`prepare:seed` 运行该目标 Node.js 与内置 pnpm，因此按平台和 CPU 过滤的可选依赖会使 pnpm store 与 seed 成为目标专用内容。它生成本地核心包映射、禁用全局 virtual store、从 npm 物化外部生产依赖并禁用生命周期脚本、删除 `node_modules` 以及所有临时 pnpm cache、config 和 state，证明完整依赖图可以离线安装并包含私有 Host 的入口与 overlay，在适用时执行 macOS 重写，再通过一次离线安装证明重写后的 store，删除临时 pnpm 项目注册，然后把松散 store 替换为 16 个确定性的未压缩 tar 分片。它会解包这些最终分片，并在生成清单前验证每个内嵌 macOS 签名。后续 GUI 插件操作保留本地核心包映射，同时从固定的 Desktop npm registry 解析插件包及其外部依赖。`electron-builder` 把各目标的平台产物写到 `apps/desktop/.desktop-build/targets/<target>/artifacts`；后续版本会保留不同名称的不可变安装包与 blockmap，但会替换该目标的未打包应用、诊断文件、完成记录与频道元数据。
 
-未压缩产物包含四块相互独立的体积：Electron、离线 seed store 分片与本地 dsh tarball、上游 Node.js 与 pnpm 运行时，以及很小的桌面壳应用。分片不压缩，使外层 DMG、ZIP 或 NSIS 压缩器与差分更新器可以处理稳定的数据区间。文件系统占用不等于安装包下载大小，因此必须分别测量。打包应用首次启动时还会先把 seed store 解包到 `$DSH_HOME/desktop/pnpm/store`，再安装可写 profile，因此发布验证必须同时测量应用与 Harness home 的磁盘占用。
+未压缩产物包含 Electron、预构建运行包、离线维护 store 分片与本地 tarball、内置 Node.js 与 pnpm，以及桌面壳。运行包增加发布体积，换取首次启动不必展开 store 和运行 pnpm。外层 DMG、ZIP 或 NSIS 压缩器处理未压缩归档。须分别测量安装包下载大小，以及应用和部署后 Harness home 的磁盘占用。
 
 ## 更新
 

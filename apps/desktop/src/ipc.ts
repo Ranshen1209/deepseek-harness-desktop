@@ -18,11 +18,13 @@ export const DESKTOP_IPC = {
 } as const
 
 /** First-run and upgrade progress rendered by the Desktop-owned setup page. */
-export type DesktopSetupPhase = DesktopReleaseProgressPhase | 'starting'
+export type DesktopSetupPhase = DesktopReleaseProgressPhase | 'starting' | 'ready'
 
 /** Desktop first-run setup state rendered by desktop-owned UI. */
 export interface DesktopSetupState {
   readonly phase: DesktopSetupPhase
+  readonly completedBytes?: number
+  readonly totalBytes?: number
 }
 
 /** Desktop release update state rendered by desktop-owned UI. */

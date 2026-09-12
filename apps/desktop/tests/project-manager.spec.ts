@@ -17,6 +17,7 @@ import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import { DESKTOP_PACKAGES_DIR, DESKTOP_PACKAGE_SET_FILE } from '../src/core-package-set.ts'
 import type { DesktopRelease } from '../src/release.ts'
 import { archivePnpmStore, SEED_STORE_ARCHIVE_DIR } from '../src/seed-store.ts'
+import { createRuntimeImage } from '../src/runtime-image.ts'
 
 const roots: string[] = []
 const releaseWorkers: Array<() => Promise<void>> = []
@@ -78,9 +79,17 @@ function writeCorePackageSet(seed: string, version: string): void {
   })}\n`)
 }
 
-function createTestSeedMetadata(seed: string, desktopRelease: DesktopRelease): void {
+async function createTestSeedMetadata(seed: string, desktopRelease: DesktopRelease): Promise<void> {
   writeCorePackageSet(seed, desktopRelease.version)
   createSeedMetadata(seed, desktopRelease)
+  for (const name of ['dsh', 'dsh-desktop-host']) {
+    const root = join(seed, 'node_modules', '@deepseek-ai', name)
+    mkdirSync(join(root, 'lib'), { recursive: true })
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: `@deepseek-ai/${name}`, version: desktopRelease.version, type: 'module' }))
+    writeFileSync(join(root, 'lib', 'index.js'), '')
+  }
+  await createRuntimeImage(seed, desktopRelease.version, process)
+  rmSync(join(seed, 'node_modules'), { recursive: true })
 }
 
 function writeFakePnpm(root: string): string {
@@ -184,7 +193,7 @@ describe('desktop package policy', () => {
 
   it('rejects any seed content changed after release inventory generation', async () => {
     const seed = join(temporaryRoot(), 'seed')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     writeIntegrity(seed)
     await expect(verifySeedIntegrity(seed)).resolves.toBeUndefined()
@@ -194,11 +203,49 @@ describe('desktop package policy', () => {
 })
 
 describe('desktop project transactions', () => {
-  it('installs the offline seed and reconciles a mismatched private Host', async () => {
+  it('starts the first installation once and removes it if readiness fails', async () => {
+    const seed = join(temporaryRoot(), 'seed')
+    await createTestSeedMetadata(seed, release())
+    archiveStore(seed)
+    writeIntegrity(seed)
+    const paths = resolveDesktopPaths(join(temporaryRoot(), '.dsh'))
+    const manager = new DesktopProjectManager(paths, { node: process.execPath, pnpm: 'must-not-run' })
+    let probes = 0
+    let starts = 0
+    await expect(manager.applyRelease(seed, '1.0.0', hooks({
+      healthCheck: async () => { probes += 1 },
+      afterActivate: async () => { starts += 1; throw new Error('backend unavailable') },
+    }))).rejects.toThrow('backend unavailable')
+    expect(probes).toBe(0)
+    expect(starts).toBe(1)
+    expect(existsSync(paths.profile)).toBe(false)
+    expect(existsSync(paths.pending)).toBe(false)
+    await manager.applyRelease(seed, '1.0.0', hooks({ afterActivate: async () => { starts += 1 } }))
+    expect(starts).toBe(2)
+    expect(manager.dshVersion()).toBe('1.0.0')
+  })
+
+  it('discards an initial activation interrupted before readiness was committed', async () => {
+    const seed = join(temporaryRoot(), 'seed')
+    await createTestSeedMetadata(seed, release())
+    archiveStore(seed)
+    writeIntegrity(seed)
+    const paths = resolveDesktopPaths(join(temporaryRoot(), '.dsh'))
+    const manager = new DesktopProjectManager(paths, { node: process.execPath, pnpm: 'must-not-run' })
+    await manager.applyRelease(seed, '1.0.0', hooks())
+    writeFileSync(paths.pending, JSON.stringify({ schemaVersion: 1, id: 'interrupted', initial: true,
+      stagingProfile: join(paths.staging, 'interrupted', 'profile'), step: 'staging-activated' }))
+    manager.recover()
+    expect(existsSync(paths.profile)).toBe(false)
+    expect(existsSync(paths.pending)).toBe(false)
+    await expect(manager.applyRelease(seed, '1.0.0', hooks())).resolves.toBe(true)
+  })
+
+  it('deploys the runtime image and reconciles a mismatched private Host without pnpm', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
     const log = join(root, 'pnpm-log.json')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     mkdirSync(join(seed, 'store'), { recursive: true })
     writeFileSync(join(seed, 'store', 'seed-entry'), 'content')
@@ -234,23 +281,14 @@ describe('desktop project transactions', () => {
     )) as { version: string }
     expect(installedHost.version).toBe('1.0.0')
     expect(existsSync(join(paths.profile, 'desktop-plugins.json'))).toBe(false)
-    expect(readFileSync(join(paths.pnpm.store, 'seed-entry'), 'utf8')).toBe('content')
-    const invocation = JSON.parse(readFileSync(log, 'utf8')) as { args: string[]; env: Record<string, string> }
-    expect(invocation.args).toContain('--offline')
-    expect(invocation.args).toContain('--trust-lockfile')
-    expect(invocation.args).toContain(`--config.store-dir=${paths.pnpm.store}`)
-    expect(invocation.args).toContain('--config.enable-global-virtual-store=false')
-    expect(invocation.args).toContain('--config.registry=https://registry.npmjs.org/')
-    expect(invocation.env.NPM_CONFIG_REGISTRY).toBe('https://registry.npmjs.org/')
-    expect(invocation.env.NPM_CONFIG_STORE_DIR).toBe(paths.pnpm.store)
-    expect(invocation.env.NPM_CONFIG_USERCONFIG).toBe(join(paths.pnpm.config, 'npmrc'))
-    expect(invocation.env.npm_config_registry).toBeUndefined()
+    expect(existsSync(paths.pnpm.store)).toBe(false)
+    expect(existsSync(log)).toBe(false)
   })
 
   it('restores the active project when the replacement backend cannot start', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     archiveStore(seed)
     writeIntegrity(seed)
@@ -272,7 +310,7 @@ describe('desktop project transactions', () => {
   it('restores rollback when the active move completed before its journal update', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     archiveStore(seed)
     writeIntegrity(seed)
@@ -305,14 +343,15 @@ describe('desktop project transactions', () => {
     const seed = join(root, 'seed')
     const ready = join(root, 'pnpm-ready')
     const releaseWorker = join(root, 'pnpm-release')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     archiveStore(seed)
     writeIntegrity(seed)
     const paths = resolveDesktopPaths(join(root, '.dsh'))
     const runtime = { node: process.execPath, pnpm: writeBlockingFakePnpm(root, ready, releaseWorker) }
     const manager = new DesktopProjectManager(paths, runtime)
-    const installing = manager.applyRelease(seed, '1.0.0', hooks())
+    await manager.applyRelease(seed, '1.0.0', hooks())
+    const installing = manager.mutate({ type: 'plugin-add', spec: '@scope/plugin@2.0.0' }, hooks())
     // Teardown observes failures even if the runner has abandoned the test body.
     const completed = installing.then(value => ({ value }), (error: unknown) => ({ error }))
     releaseWorkers.push(async () => {
@@ -331,7 +370,7 @@ describe('desktop project transactions', () => {
     const competing = new DesktopProjectManager(paths, runtime)
     await expect(competing.applyRelease(seed, '1.0.0', hooks())).rejects.toThrow(/another package transaction is active/u)
     writeFileSync(releaseWorker, 'continue')
-    await expect(installing).resolves.toBe(true)
+    await expect(installing).resolves.toBeUndefined()
     expect(existsSync(paths.lock)).toBe(false)
   })
 
@@ -339,7 +378,7 @@ describe('desktop project transactions', () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
     const log = join(root, 'pnpm-log.json')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     archiveStore(seed)
     writeIntegrity(seed)
@@ -375,7 +414,7 @@ describe('desktop project transactions', () => {
     const paths = resolveDesktopPaths(join(root, '.dsh'))
     const manager = new DesktopProjectManager(paths, { node: process.execPath, pnpm: writeFakePnpm(root) })
     const firstSeed = join(root, 'seed-1')
-    createTestSeedMetadata(firstSeed, release('1.0.0'))
+    await createTestSeedMetadata(firstSeed, release('1.0.0'))
     writeFileSync(join(firstSeed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     mkdirSync(join(firstSeed, 'store'), { recursive: true })
     writeFileSync(join(firstSeed, 'store', 'release-1'), 'one')
@@ -385,7 +424,7 @@ describe('desktop project transactions', () => {
     await manager.mutate({ type: 'plugin-add', spec: '@scope/plugin@2.0.0' }, hooks())
 
     const nextSeed = join(root, 'seed-2')
-    createTestSeedMetadata(nextSeed, release('1.1.0'))
+    await createTestSeedMetadata(nextSeed, release('1.1.0'))
     writeFileSync(join(nextSeed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     mkdirSync(join(nextSeed, 'store'), { recursive: true })
     writeFileSync(join(nextSeed, 'store', 'release-2'), 'two')
@@ -404,7 +443,7 @@ describe('desktop project transactions', () => {
       '@deepseek-ai/dsh-web-app',
       '@scope/plugin',
     ])
-    expect(readFileSync(join(paths.pnpm.store, 'release-1'), 'utf8')).toBe('one')
+    expect(existsSync(join(paths.pnpm.store, 'release-1'))).toBe(false)
     expect(readFileSync(join(paths.pnpm.store, 'release-2'), 'utf8')).toBe('two')
     await expect(manager.applyRelease(nextSeed, '1.1.0', hooks())).resolves.toBe(false)
   })
@@ -412,7 +451,7 @@ describe('desktop project transactions', () => {
   it('reuses a matching installed release without reading seed store archives', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     archiveStore(seed)
     writeIntegrity(seed)
@@ -429,15 +468,15 @@ describe('desktop project transactions', () => {
   it('reports seed-install progress only while the packaged release is applied', async () => {
     const root = temporaryRoot()
     const seed = join(root, 'seed')
-    createTestSeedMetadata(seed, release())
+    await createTestSeedMetadata(seed, release())
     writeFileSync(join(seed, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n')
     archiveStore(seed)
     writeIntegrity(seed)
     const paths = resolveDesktopPaths(join(root, '.dsh'))
     const manager = new DesktopProjectManager(paths, { node: process.execPath, pnpm: writeFakePnpm(root) })
     const phases: DesktopReleaseProgressPhase[] = []
-    await expect(manager.applyRelease(seed, '1.0.0', hooks(), (phase) => { phases.push(phase) })).resolves.toBe(true)
-    expect(phases).toEqual(['verifying', 'store', 'installing', 'health', 'activating'])
+    await expect(manager.applyRelease(seed, '1.0.0', hooks(), (phase) => { if (phases.at(-1) !== phase) phases.push(phase) })).resolves.toBe(true)
+    expect(phases).toEqual(['verifying', 'installing', 'activating'])
     const reuse: DesktopReleaseProgressPhase[] = []
     await expect(manager.applyRelease(seed, '1.0.0', hooks(), (phase) => { reuse.push(phase) })).resolves.toBe(false)
     expect(reuse).toEqual([])

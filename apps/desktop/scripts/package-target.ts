@@ -277,6 +277,17 @@ async function main(): Promise<void> {
   await runPnpm(['run', 'prepare:runtime'], targetEnv)
   await runPnpm(['run', 'prepare:packages'], targetEnv)
   await runPnpm(['run', 'prepare:seed'], targetEnv)
+  await new Promise<void>((resolvePromise, reject) => {
+    const node = join(buildPaths.runtime, 'node', target.platform === 'win32' ? 'node.exe' : 'node')
+    const child = spawn(node, ['--import', 'tsx', 'scripts/verify-prepared-runtime.ts'], {
+      cwd: APP_ROOT, env: targetEnv, stdio: 'inherit',
+    })
+    child.once('error', reject)
+    child.once('close', (code, signal) => {
+      if (code === 0) resolvePromise()
+      else reject(new Error(`desktop runtime verification exited with ${String(code ?? signal)}`))
+    })
+  })
   if (invocation.prepareOnly) return
   await runPnpm(desktopElectronBuilderArguments(target, invocation.directory), electronBuilderEnv)
   if (!invocation.directory && targetEnv.DSH_DESKTOP_UNSIGNED !== '1') {

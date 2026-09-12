@@ -35,6 +35,7 @@ import {
 import type { DesktopPaths } from './paths.ts'
 import { parseDesktopRelease, type DesktopRelease } from './release.ts'
 import { extractPnpmStoreArchives, mergePnpmStore } from './seed-store.ts'
+import { extractRuntimeImage, RUNTIME_IMAGE_ARCHIVE, type RuntimeImageProgress } from './runtime-image.ts'
 
 /** Files the package transaction copies between active and staging projects. */
 const DESKTOP_PROJECT_FILES = [
@@ -73,6 +74,7 @@ interface DesktopPendingTransaction {
   readonly id: string
   readonly stagingProfile: string
   readonly step: 'prepared' | 'active-moved' | 'staging-activated'
+  readonly initial?: true
 }
 
 /** Exact executables the desktop shell bundles. */
@@ -261,13 +263,16 @@ function seedFilePaths(root: string): readonly string[] {
 /**
  * Verify the packaged offline seed before any content enters writable desktop state.
  * @param seedDir - packaged seed directory whose integrity.json inventory will be hashed.
+ * @param mode - runtime authenticates metadata; extractRuntimeImage authenticates its archive during extraction.
  */
-export async function verifySeedIntegrity(seedDir: string): Promise<void> {
+export async function verifySeedIntegrity(seedDir: string, mode: 'complete' | 'runtime' = 'complete'): Promise<void> {
   const integrityPath = join(seedDir, 'integrity.json')
   const integrity = readJson(integrityPath)
   if (!isRecord(integrity) || integrity.schemaVersion !== 2 || !Array.isArray(integrity.files)) {
     throw new Error(`desktop seed: invalid integrity inventory ${integrityPath}`)
   }
+  const selected = (path: string): boolean => mode === 'complete'
+    || (path !== RUNTIME_IMAGE_ARCHIVE && !path.startsWith('store-archives/'))
   const expected: DesktopSeedIntegrityRecord[] = integrity.files.map((record) => {
     if (!isRecord(record) || typeof record.path !== 'string' || record.path === '' || record.path.startsWith('/')
       || record.path.split('/').includes('..') || typeof record.bytes !== 'number'
@@ -276,8 +281,9 @@ export async function verifySeedIntegrity(seedDir: string): Promise<void> {
       throw new Error(`desktop seed: invalid integrity record in ${integrityPath}`)
     }
     return { path: record.path, bytes: record.bytes, sha256: record.sha256 }
-  }).sort((left, right) => left.path.localeCompare(right.path))
-  const actual = (await mapLimit(seedFilePaths(seedDir), SEED_HASH_CONCURRENCY, async (path) => {
+  }).filter(record => selected(record.path)).sort((left, right) => left.path.localeCompare(right.path))
+  const selectedPaths = seedFilePaths(seedDir).filter(path => selected(path.slice(seedDir.length + 1).split(sep).join('/')))
+  const actual = (await mapLimit(selectedPaths, SEED_HASH_CONCURRENCY, async (path) => {
     const hashed = await hashFileSha256(path)
     return {
       path: path.slice(seedDir.length + 1).split(sep).join('/'),
@@ -385,6 +391,7 @@ export class DesktopProjectManager {
     if (!isRecord(value) || value.schemaVersion !== 1
       || typeof value.id !== 'string' || typeof value.stagingProfile !== 'string'
       || !isDescendant(this.paths.staging, value.stagingProfile)
+      || (value.initial !== undefined && value.initial !== true)
       || (value.step !== 'prepared' && value.step !== 'active-moved' && value.step !== 'staging-activated')) {
       throw new Error(`desktop project: invalid activation journal ${this.paths.pending}`)
     }
@@ -393,6 +400,13 @@ export class DesktopProjectManager {
       id: value.id,
       stagingProfile: value.stagingProfile,
       step: value.step,
+      ...(value.initial === true ? { initial: true } : {}),
+    }
+    if (pending.initial === true) {
+      if (pending.step !== 'prepared') removeOwnedDirectory(this.paths.profile)
+      removeOwnedDirectory(pending.stagingProfile)
+      unlinkSync(this.paths.pending)
+      return
     }
     if (!existsSync(this.paths.profile) && existsSync(this.paths.rollback)) {
       mkdirSync(dirname(this.paths.profile), { recursive: true })
@@ -465,7 +479,7 @@ export class DesktopProjectManager {
     seedDir: string,
     electronVersion: string,
     hooks: DesktopProjectHooks,
-    onProgress?: (phase: DesktopReleaseProgressPhase) => void,
+    onProgress?: (phase: DesktopReleaseProgressPhase, progress?: RuntimeImageProgress) => void,
   ): Promise<boolean> {
     return this.withLock(async () => {
       this.recover()
@@ -479,17 +493,23 @@ export class DesktopProjectManager {
         verifyDesktopCorePackageSet(this.paths.profile, target.version)
         return false
       }
+      const initial = !existsSync(this.paths.profile)
+      const plugins = initial ? [] : pluginRecords(this.paths.profile)
+      const useImage = plugins.length === 0
       onProgress?.('verifying')
-      await verifySeedIntegrity(seedDir)
+      await verifySeedIntegrity(seedDir, useImage ? 'runtime' : 'complete')
       verifyDesktopCorePackageSet(seedDir, target.version)
-      onProgress?.('store')
-      await this.mergeSeedPnpmState(seedDir)
+      if (!useImage) {
+        onProgress?.('store')
+        await this.mergeSeedPnpmState(seedDir)
+      }
       const stagingProfile = this.newStagingProfile()
       try {
-        if (existsSync(this.paths.profile)) {
-          const plugins = pluginRecords(this.paths.profile)
-          copyMetadata(seedDir, stagingProfile)
-          onProgress?.('installing')
+        copyMetadata(seedDir, stagingProfile)
+        onProgress?.('installing')
+        if (useImage) {
+          await extractRuntimeImage(seedDir, stagingProfile, target.version, progress => onProgress?.('installing', progress))
+        } else {
           await this.runPnpm(stagingProfile, ['install', '--offline', '--frozen-lockfile', '--trust-lockfile'])
           if (plugins.length > 0) {
             await this.runPnpm(stagingProfile, [
@@ -500,15 +520,13 @@ export class DesktopProjectManager {
             ])
             writeProfilePlugins(stagingProfile, plugins)
           }
-        } else {
-          copyMetadata(seedDir, stagingProfile)
-          onProgress?.('installing')
-          await this.runPnpm(stagingProfile, ['install', '--offline', '--frozen-lockfile', '--trust-lockfile'])
         }
-        onProgress?.('health')
-        await hooks.healthCheck(stagingProfile)
+        if (!initial) {
+          onProgress?.('health')
+          await hooks.healthCheck(stagingProfile)
+        }
         onProgress?.('activating')
-        await this.activate(stagingProfile, hooks)
+        await this.activate(stagingProfile, hooks, initial)
         return true
       } catch (error) {
         removeOwnedDirectory(stagingProfile)
@@ -597,12 +615,13 @@ export class DesktopProjectManager {
     }
   }
 
-  private async activate(stagingProfile: string, hooks: DesktopProjectHooks): Promise<void> {
+  private async activate(stagingProfile: string, hooks: DesktopProjectHooks, initial = false): Promise<void> {
     const pending: DesktopPendingTransaction = {
       schemaVersion: 1,
       id: basename(dirname(stagingProfile)),
       stagingProfile,
       step: 'prepared',
+      ...(initial ? { initial: true } : {}),
     }
     writeJson(this.paths.pending, pending)
     await hooks.beforeActivate()
@@ -621,10 +640,11 @@ export class DesktopProjectManager {
       await hooks.afterActivate()
       unlinkSync(this.paths.pending)
     } catch (error) {
+      await hooks.beforeActivate()
       if (existsSync(this.paths.profile)) removeOwnedDirectory(this.paths.profile)
       if (activeMoved && existsSync(this.paths.rollback)) renameSync(this.paths.rollback, this.paths.profile)
       if (existsSync(this.paths.pending)) unlinkSync(this.paths.pending)
-      await hooks.afterActivate().catch(() => undefined)
+      if (activeMoved) await hooks.afterActivate().catch(() => undefined)
       throw error
     }
   }

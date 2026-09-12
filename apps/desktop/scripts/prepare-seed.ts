@@ -30,6 +30,7 @@ import {
   verifyMacOSSeedStore,
 } from './macos-seed-store.ts'
 import { resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
+import { createRuntimeImage } from '../src/runtime-image.ts'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
 const BUILD_PATHS = resolveDesktopTargetBuildPaths()
@@ -135,6 +136,10 @@ async function verifyOfflineInstallation(release: DesktopRelease): Promise<void>
         throw new Error(`desktop seed: local ${DESKTOP_HOST_PACKAGE}@${release.version} does not contain ${file}`)
       }
     }
+    await createRuntimeImage(SEED_ROOT, release.version, {
+      platform: process.env.DSH_DESKTOP_TARGET_PLATFORM ?? process.platform,
+      arch: process.env.DSH_DESKTOP_TARGET_ARCH ?? process.arch,
+    })
   } finally {
     rmSync(installedModules, { recursive: true, force: true })
   }
@@ -158,7 +163,6 @@ async function main(): Promise<void> {
     await runPnpm(['install', '--prod', '--frozen-lockfile', '--trust-lockfile', '--ignore-scripts'])
     rmSync(installedModules, { recursive: true, force: true })
     rmSync(PNPM_BUILD_STATE, { recursive: true, force: true })
-    await verifyOfflineInstallation(release)
     const targetPlatform = process.env.DSH_DESKTOP_TARGET_PLATFORM ?? process.platform
     const unsigned = process.env.DSH_DESKTOP_UNSIGNED === '1'
     let signedMachOFiles: number | undefined
@@ -174,8 +178,8 @@ async function main(): Promise<void> {
       process.stdout.write(
         `desktop seed: signed ${signing.signedFiles} Mach-O files, updated ${signing.updatedIndexRows} pnpm index records, and pruned ${signing.prunedOrphans} native orphans\n`,
       )
-      await verifyOfflineInstallation(release)
     }
+    await verifyOfflineInstallation(release)
     removePnpmProjectRegistrations(STORE_ROOT)
     archivePnpmStore(SEED_ROOT, STORE_ROOT)
     if (!unsigned && macOSSigning !== undefined && signedMachOFiles !== undefined) {

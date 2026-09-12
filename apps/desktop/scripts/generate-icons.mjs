@@ -27,6 +27,9 @@ async function renderWindowsSource() {
 
 async function main() {
   mkdirSync(OUTPUT, { recursive: true })
+  const logo = readFileSync(SOURCE, "utf8").match(/<g transform="[^"]+">([\s\S]*?)<\/g>/)?.[1]
+  if (logo === undefined) throw new Error("desktop icons: missing logo group")
+  writeFileSync(join(APP_ROOT, "renderer", "deepseek-mark.svg"), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 1.5 24 21">${logo}</svg>\n`)
   const source = await renderSource()
   const windowsSource = await renderWindowsSource()
   const icns = png2icons.createICNS(source, png2icons.BICUBIC, 0)

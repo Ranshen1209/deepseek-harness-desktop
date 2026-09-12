@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-09-11-desktop-windows-first-launch.zh.md)
 
+The [runtime image decision](../architecture/2026-09-11-desktop-runtime-image.md) supersedes the first-install path below. Its single-start journal preserves failure recovery; the store extraction optimizations remain in use for upgrades that restore plugins.
+
 ## Problem
 
 On Windows, the first packaged Desktop launch can sit on a blank desktop for a long time. The Electron main process hashed every seed file, listed then extracted every pnpm store archive, copied that tree into `.dsh/desktop/pnpm/store`, ran offline `pnpm install`, and health-checked the backend before it created a window. Windows Defender then scanned each newly written file. Subsequent launches with a matching profile still hashed the unused seed, including large store archives, before starting the backend.

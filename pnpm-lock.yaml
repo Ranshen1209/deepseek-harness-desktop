@@ -534,6 +534,9 @@ importers:
       png2icons:
         specifier: ^2.0.1
         version: 2.0.1
+      playwright:
+        specifier: ^1.49.0
+        version: 1.61.1
       pnpm:
         specifier: 11.7.0
         version: 11.7.0

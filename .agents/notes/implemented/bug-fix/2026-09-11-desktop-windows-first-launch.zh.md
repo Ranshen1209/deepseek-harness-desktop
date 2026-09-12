@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-09-11-desktop-windows-first-launch.md) | 中文
 
+[运行包决策](../architecture/2026-09-11-desktop-runtime-image.zh.md)取代下文的首次安装路径。它用一次启动及日志保留失败恢复；store 解包优化继续用于恢复插件的升级。
+
 ## Problem
 
 在 Windows 上，打包后的 Desktop 应用第一次启动可能长时间停在空白桌面。Electron 主进程会在创建窗口之前哈希每个 seed 文件、先列出再解包每个 pnpm store 归档、把该目录复制进 `.dsh/desktop/pnpm/store`、执行离线 `pnpm install`，并对后端做健康检查。Windows Defender 随后扫描每个新写入的文件。即使后续启动已有匹配的 profile，进程仍会在启动后端前哈希不会被使用的 seed，包括大型 store 归档。

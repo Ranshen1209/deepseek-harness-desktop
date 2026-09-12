@@ -36,13 +36,22 @@ jobs:
           node-version: 24.17.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run apps/desktop/tests/runtime-image.spec.ts apps/desktop/tests/project-manager.spec.ts apps/desktop/tests/host-process.spec.ts apps/desktop/tests/locale.spec.ts
+      - run: pnpm --filter @deepseek-ai/dsh-desktop exec playwright install chromium
+      - run: pnpm --filter @deepseek-ai/dsh-desktop run test:ui
+        env:
+          DSH_DESKTOP_UI_ARTIFACTS: ${{ github.workspace }}/apps/desktop/.desktop-build/targets/mac-arm64/ui
       - run: pnpm run generate:desktop-icons
       - run: pnpm run package:desktop:mac:arm64
       - run: node .github/verify-desktop-version.mjs mac-arm64
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-macos-arm64
-          path: apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*
+          path: |
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.dmg
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.zip
+            apps/desktop/.desktop-build/targets/mac-arm64/runtime-smoke.json
+            apps/desktop/.desktop-build/targets/mac-arm64/ui/*.png
           if-no-files-found: error
 
   package-windows-x64:
@@ -58,14 +67,20 @@ jobs:
           node-version: 24.17.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
+      - run: pnpm exec vitest run apps/desktop/tests/runtime-image.spec.ts apps/desktop/tests/project-manager.spec.ts apps/desktop/tests/host-process.spec.ts apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
+      - run: pnpm --filter @deepseek-ai/dsh-desktop run test:ui
+        env:
+          DSH_DESKTOP_UI_ARTIFACTS: ${{ github.workspace }}/apps/desktop/.desktop-build/targets/win-x64/ui
       - run: pnpm run generate:desktop-icons
       - run: pnpm run package:desktop:win:x64
       - run: node .github/verify-desktop-version.mjs win-x64
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-x64
-          path: apps/desktop/.desktop-build/targets/win-x64/artifacts/*
+          path: |
+            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.exe
+            apps/desktop/.desktop-build/targets/win-x64/runtime-smoke.json
+            apps/desktop/.desktop-build/targets/win-x64/ui/*.png
           if-no-files-found: error
 
   release:
