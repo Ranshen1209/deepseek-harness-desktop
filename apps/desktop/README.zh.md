@@ -23,9 +23,9 @@
 
 Electron 拥有保留 profile `$DSH_HOME/profiles/desktop`。其 manifest 通过 `dsh.profile.bundles` 列出内置与已安装插件 bundle，`node_modules` 则同时包含精确版本的 `@deepseek-ai/dsh`、与之匹配的私有 `@deepseek-ai/dsh-desktop-host` 和所有桌面插件。把 Electron 专用进程入口与 overlay 放入私有应用包，可以避免 Desktop 实现成为公共 CLI 包的一部分。CLI 不能启动或修改该 profile。Electron 始终调用自身内置的 Node.js 与 pnpm，并把 store 固定在 `$DSH_HOME/desktop/pnpm/store`；它绝不使用系统 pnpm 或调用方的 npm/pnpm 配置。
 
-dsh 主渲染进程只获得桌面协议标记。首次启动窗口获得 locale 与安装进度；插件窗口获得结构化的列出、安装、移除、更新和更新检查操作。两个渲染进程都拿不到文件系统、原始 Electron IPC、shell 或任意 pnpm 参数。
+dsh 主渲染进程只获得桌面协议标记。启动窗口获得 locale 与安装进度；插件窗口获得结构化的列出、安装、移除、更新和更新检查操作。两个渲染进程都拿不到文件系统、原始 Electron IPC、shell 或任意 pnpm 参数。
 
-Electron 根据应用 locale 选择类型化的中英文字典，并以英文作为 fallback。菜单、原生对话框、首次启动渲染进程与插件管理渲染进程使用同一 locale 数据；Windows 菜单命令只有在执行前需要用户补充信息时才使用省略号；仓库的 Client UI i18n gate 会检查这些桌面源文件。
+Electron 根据应用 locale 选择类型化的中英文字典，并以英文作为 fallback。菜单、原生对话框、启动渲染进程与插件管理渲染进程使用同一 locale 数据；Windows 菜单命令只有在执行前需要用户补充信息时才使用省略号；仓库的 Client UI i18n gate 会检查这些桌面源文件。
 
 ### Seed 安装
 
@@ -45,9 +45,9 @@ Electron 根据应用 locale 选择类型化的中英文字典，并以英文作
 3. 没有插件的 profile 验证元数据、复制 profile 元数据，并在校验字节的同时解包运行包；该路径不运行 pnpm，也不填充其 store。
 4. 已有插件的升级验证完整 seed、解包并合并 store、在 staging 离线安装，再恢复每个已记录的精确插件版本。插件专属缓存记录继续保留。
 5. 首次安装登记初始激活日志，在最终路径启动一次后端；就绪成功才提交，失败则删除该安装。恢复过程丢弃尚未提交就绪的初始激活。替换现有 profile 在使用新后端前仍保留 staging 健康检查和回滚。
-6. 后端和页面就绪后立即显示产品窗口。准备页通过 DeepSeek 粒子、本地化阶段和实际读取字节呈现进度，不设置最短动画时长；减少动态效果偏好会关闭动画，隐藏页面停止绘制。
+6. 后端和页面就绪后立即显示产品窗口。每次进程启动都显示旋转轨道粒子场中的 DeepSeek 粒子标志，支持鼠标排斥、视差、粒子拖尾和点击粒子爆发；聚焦已运行的进程不会重播启动场景。页面通过本地化阶段和实际读取字节呈现进度，不设置最短动画时长。减少动态效果偏好显示静态标志；隐藏页面暂停绘制，就绪或页面销毁时释放动画监听。
 
-原生打包会在隔离 home 中部署运行包、启动后端并验证客户端文档，之后才生成安装器。目标目录内的 `runtime-smoke.json` 记录该构建机的阶段耗时、一次后端启动和零次 pnpm 调用。`pnpm --filter @deepseek-ai/dsh-desktop run test:ui` 检查两种语言、进度、小窗口布局、减少动态效果和清理；Windows 使用 Edge，其他平台使用已安装的 Playwright Chromium。
+原生打包会在隔离 home 中部署运行包、启动后端并验证客户端文档，之后才生成安装器。目标目录内的 `runtime-smoke.json` 记录该构建机的阶段耗时、一次后端启动和零次 pnpm 调用。`pnpm --filter @deepseek-ai/dsh-desktop run test:ui` 检查两种语言、进度、小窗口布局、减少动态效果、与相同未扰动场景对照的鼠标和点击响应，以及清理；Windows 使用 Edge，其他平台使用已安装的 Playwright Chromium。
 
 Electron 生命周期锁拥有 profile。包事务锁在本地准备时记录 Electron，在 pnpm worker 仍可能写入时记录该 worker。插件变更保留 staging、健康检查、激活和回滚路径。
 

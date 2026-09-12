@@ -3,5 +3,7 @@
   "verifying": "Checking your app…",
   "installing": "Preparing files · 65%",
   "starting": "Opening your workspace…",
-  "ready": "Ready to begin"
+  "ready": "Ready to begin",
+  "description": "From one idea, infinite possibilities.",
+  "interaction": "Move to explore · Click to scatter stardust"
 }

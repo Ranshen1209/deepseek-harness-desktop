@@ -155,7 +155,7 @@ async function main(): Promise<void> {
   const managementPreload = fileURLToPath(new URL('./preload.cjs', import.meta.url))
   let setupWindow: BrowserWindow | undefined
   let setupState: DesktopSetupState = { phase: 'verifying' }
-  let seedInstallInProgress = false
+  let startupInProgress = false
 
   const publishUpdate = (state: DesktopUpdateState): DesktopUpdateState => {
     updateState = state
@@ -192,7 +192,7 @@ async function main(): Promise<void> {
     return setupState
   })
   app.on('window-all-closed', () => {
-    if (seedInstallInProgress) return
+    if (startupInProgress) return
     if (process.platform !== 'darwin') app.quit()
   })
 
@@ -250,32 +250,31 @@ async function main(): Promise<void> {
 
   const needsSeedInstall = development === undefined
     && !manager.matchesPackagedRelease(resources.seed, app.getVersion())
-  if (needsSeedInstall) {
-    seedInstallInProgress = true
-    setupWindow = createWindow(managementPreload, {
-      width: 640,
-      height: 460,
-      minWidth: 480,
-      minHeight: 300,
-      resizable: false,
-      maximizable: false,
-      backgroundColor: '#070d20',
-      titleBarStyle: 'hidden',
-      ...(process.platform === 'win32' ? { titleBarOverlay: { color: '#070d20', symbolColor: '#b6c9f0', height: 32 } } : {}),
-    })
-    setupWindow.setMenu(null)
-    setupWindow.setTitle(messages.setupWindowTitle)
-    setupWindow.once('ready-to-show', () => { setupWindow?.show() })
-    focusPrimaryWindow = () => {
-      const window = setupWindow
-      if (window === undefined || window.isDestroyed()) return
-      if (window.isMinimized()) window.restore()
-      window.show()
-      window.focus()
-    }
-    await setupWindow.loadURL(`${SCHEME}://shell/first-run.html`)
-    publishSetup({ phase: 'verifying' })
+  startupInProgress = true
+  setupState = { phase: needsSeedInstall ? 'verifying' : 'starting' }
+  setupWindow = createWindow(managementPreload, {
+    width: 760,
+    height: 540,
+    minWidth: 480,
+    minHeight: 300,
+    resizable: false,
+    maximizable: false,
+    backgroundColor: '#050918',
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'win32' ? { titleBarOverlay: { color: '#050918', symbolColor: '#b6c9f0', height: 32 } } : {}),
+  })
+  setupWindow.setMenu(null)
+  setupWindow.setTitle(messages.setupWindowTitle)
+  setupWindow.once('ready-to-show', () => { if (!setupWindow?.isDestroyed()) setupWindow?.show() })
+  focusPrimaryWindow = () => {
+    const window = setupWindow
+    if (window === undefined || window.isDestroyed()) return
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
   }
+  await setupWindow.loadURL(`${SCHEME}://shell/first-run.html`)
+  publishSetup(setupState)
   if (development === undefined) {
     // Deployment only accesses real files; the setup assets have finished loading.
     // Avoid Electron's archive-path probing on every dependency filesystem operation.
@@ -294,7 +293,7 @@ async function main(): Promise<void> {
   }
   publishSetup({ phase: 'starting' })
   host ??= await startHost()
-  seedInstallInProgress = false
+  startupInProgress = false
 
   const updates = new DesktopUpdateCoordinator(
     publishUpdate,
