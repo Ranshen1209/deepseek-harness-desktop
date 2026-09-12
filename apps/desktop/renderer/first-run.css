@@ -16,7 +16,7 @@ body { margin: 0; overflow: hidden; }
 .setup-card { width: min(100%, 420px); text-align: center; }
 .logo-stage { position: relative; display: grid; place-items: center; height: 236px; margin: 0 auto 14px; }
 .logo-halo { position: absolute; width: 200px; height: 110px; border-radius: 50%; background: #417cff26; filter: blur(32px); animation: breathe 5s ease-in-out infinite; }
-#logo { object-fit: contain; opacity: 0; filter: brightness(1.7) drop-shadow(0 0 22px #537dff55); transform: translate(var(--parallax-x, 0px), var(--parallax-y, 0px)); transition: opacity 700ms ease; }
+#logo { object-fit: contain; opacity: 0; transform: translate(var(--parallax-x, 0px), var(--parallax-y, 0px)); transition: opacity 700ms ease; }
 .assembled #logo { opacity: .16; }
 .static #logo { opacity: 1; transform: none; }
 h1 { margin: 0; font-size: 29px; font-weight: 600; letter-spacing: -.7px; text-shadow: 0 2px 22px #050918; }

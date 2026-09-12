@@ -1,7 +1,7 @@
 /** Bounded interactive canvas scene for the desktop startup window. */
 
 /**
- * Animate the DeepSeek mark and orbital field; hidden and reduced-motion pages stop drawing.
+ * Animate the DeepSeek mark and nebula; hidden and reduced-motion pages stop drawing.
  * @returns {() => void} Idempotent disposer for frames and scene event listeners.
  */
 export function startParticles() {
@@ -42,13 +42,14 @@ export function startParticles() {
   let lastFrame = 0
 
   function particle(kind, index, homeX = 0, homeY = 0) {
-    const angle = kind === 'orbit' ? index % 3 * tau / 3 + (Math.random() - .5) * .5 : Math.random() * tau
     const radius = .18 + Math.random() ** .65 * .82
-    return { kind, homeX, homeY, angle, radius, phase: Math.random() * tau,
+    return { kind, homeX, homeY, radius, phase: Math.random() * tau,
       x: 0, y: 0, offsetX: 0, offsetY: 0,
       vx: 0, vy: 0, size: .45 + Math.random() * (kind === 'logo' ? .8 : 1.1),
-      color: kind === 'logo' ? (index % 5 === 0 ? 3 : index % 2) : index % colors.length,
-      glow: index % (kind === 'logo' ? 13 : 9) === 0 }
+      color: kind === 'logo' ? 1 : index % colors.length,
+      glow: kind !== 'logo' && index % 17 === 0,
+      lane: index % 10 < 6 ? 0 : index % 10 < 9 ? 1 : 2,
+      haze: kind === 'cloud' && index % 47 === 0 }
   }
 
   function resize() {
@@ -67,7 +68,12 @@ export function startParticles() {
     particles = []
     // Fixed upper bounds keep dense scenes independent of screen resolution.
     for (let i = 0; i < 720; i += 1) particles.push(particle('star', i, Math.random(), Math.random()))
-    for (let i = 0; i < 1600; i += 1) particles.push(particle('orbit', i))
+    for (let i = 0; i < 2200; i += 1) {
+      const scatter = Math.sqrt(-2 * Math.log(Math.max(.001, Math.random()))) * Math.cos(Math.random() * tau)
+      const point = particle('cloud', i, Math.random(), scatter)
+      point.color = point.lane === 1 ? (i % 4 === 0 ? 1 : 2) : (i % 5 === 0 ? 3 : i % 2)
+      particles.push(point)
+    }
     if (!logo.complete || logo.naturalWidth === 0) return
     const sample = document.createElement('canvas')
     sample.width = 240
@@ -183,34 +189,40 @@ export function startParticles() {
     document.documentElement.style.setProperty('--parallax-y', `${pointer.tiltY * 5}px`)
     context.clearRect(0, 0, width, height)
     context.globalCompositeOperation = 'lighter'
-    const orbitSize = Math.min(width * .44, 330)
-    const flatten = .4 + pointer.tiltY * .09
-    const rotation = -.2 + Math.sin(time * .15) * .06 + pointer.tiltX * .1
-    const cos = Math.cos(rotation)
-    const sin = Math.sin(rotation)
+    const fieldSize = Math.min(width * .47, 360)
 
     for (const p of particles) {
       let x
       let y
       let alpha
-      let shimmer = 0
       if (p.kind === 'logo') {
         x = centerX + p.homeX * logoWidth + pointer.tiltX * 7 + Math.sin(time * 1.6 + p.homeY * 10) * 1.2
         y = centerY + p.homeY * logoHeight + pointer.tiltY * 5 + Math.cos(time * 1.4 + p.homeX * 8) * 1.2
         const sweep = (time - .25) / 1.05 * 1.55 - .8
         const position = p.homeX - p.homeY * .3
         const lit = Math.min(1, Math.max(0, (sweep - position) / .16))
-        const outline = p.edge ? Math.sin(Math.min(1, time / 1.4) * Math.PI) * .55 : 0
-        shimmer = Math.exp(-((position - sweep) ** 2) / .009) * .8
-        alpha = .025 + outline + lit * (.5 + Math.sin(time * 2 + p.phase) * .18) + shimmer
-      } else if (p.kind === 'orbit') {
-        const angle = p.angle + p.radius * 5.5 + (1 - unfurl) * .8 + time * (.08 + (1 - p.radius) * .14)
-        const radius = orbitSize * (.42 + p.radius * .58) * (.7 + unfurl * .3)
-        const px = Math.cos(angle) * radius
-        const py = Math.sin(angle) * radius * flatten
-        x = centerX + px * cos - py * sin + pointer.tiltX * 15
-        y = centerY + px * sin + py * cos + Math.sin(p.phase + time * .5) * 9 + pointer.tiltY * 9
-        alpha = (.14 + (Math.sin(angle) + 1) * .19) * unfurl
+        const reveal = p.edge ? Math.max(lit, Math.min(1, time / .5)) : lit
+        alpha = .6 * reveal
+      } else if (p.kind === 'cloud') {
+        const u = p.homeX
+        const flow = time * .11
+        const turbulence = Math.sin(u * 13 + p.lane * 7 + flow) * .065
+          + Math.sin(u * 31 + p.lane * 3 - flow * .7) * .028
+        const thickness = .022 + .12 * (.5 + Math.sin(u * 8 + p.lane * 3 + flow * .4) * .5) ** 2
+        const path = p.lane === 0 ? .27 - .4 * u + Math.sin(u * 6 + .1) * .28
+          : p.lane === 1 ? -.38 + Math.sin(u * 5 + 2) * .18 - .11 * u
+            : .57 - .31 * u + Math.sin(u * 8) * .09
+        const px = (u * 2 - 1) + Math.sin(p.phase + flow) * .025 + p.homeY * .012
+        const py = path + turbulence + p.homeY * thickness
+        const expansion = .78 + unfurl * .22
+        x = centerX + px * fieldSize * expansion + pointer.tiltX * (8 + p.radius * 12)
+        y = centerY + py * fieldSize * .78 * expansion + pointer.tiltY * (5 + p.radius * 9)
+        const clearing = 1 - .7 * Math.exp(-(((x - centerX) / 115) ** 2 + ((y - centerY) / 90) ** 2))
+        alpha = (.12 + p.radius * .3) * Math.sin(u * Math.PI) ** .4 * clearing * unfurl
+        if (p.haze) {
+          context.globalAlpha = alpha * .12 * entrance
+          context.drawImage(glows[p.color], x - 55, y - 55, 110, 110)
+        }
       } else {
         x = (p.homeX * width + Math.sin(time * .12 + p.phase) * 18 + width) % width
         y = (p.homeY * height - time * (1 + p.radius * 3) + height * 100) % height
@@ -230,7 +242,7 @@ export function startParticles() {
           const force = (1 - distance / 125) ** 2 * 2.8
           p.vx += (dx - dy * .45) / distance * force * dt
           p.vy += (dy + dx * .45) / distance * force * dt
-          alpha = Math.min(1, alpha + force * .24)
+          if (p.kind !== 'logo') alpha = Math.min(1, alpha + force * .24)
         }
       }
       const damping = Math.pow(.84, dt)
@@ -240,8 +252,10 @@ export function startParticles() {
       p.offsetY += p.vy * dt
       p.x = x + p.offsetX
       p.y = y + p.offsetY
-      paint(p, Math.min(1, alpha) * entrance * (p.y > centerY + logoHeight * .7 ? .48 : 1), p.kind === 'logo' ? 7 + shimmer * 12 : 10)
+      context.globalCompositeOperation = p.kind === 'logo' ? 'source-over' : 'lighter'
+      paint(p, Math.min(1, alpha) * entrance * (p.y > centerY + logoHeight * .7 ? .48 : 1), 10)
     }
+    context.globalCompositeOperation = 'lighter'
     drift(trails, dt, .035)
     drift(bursts, dt, .014)
     context.globalAlpha = 1
