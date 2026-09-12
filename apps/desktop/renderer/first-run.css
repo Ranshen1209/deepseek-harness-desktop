@@ -11,11 +11,9 @@
 body { margin: 0; overflow: hidden; }
 .setup { min-height: 100vh; display: grid; place-items: center; padding: 40px 24px 24px; isolation: isolate; }
 .setup::before { content: ""; position: absolute; inset: 0 0 auto; height: 32px; -webkit-app-region: drag; }
-#particles, .ambient { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
-.ambient { z-index: -2; background: radial-gradient(ellipse at 50% 35%, #21469c40 0%, transparent 55%), radial-gradient(ellipse at 80% 10%, #602aa51a, transparent 50%); }
+#particles { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
 .setup-card { width: min(100%, 420px); text-align: center; }
 .logo-stage { position: relative; display: grid; place-items: center; height: 236px; margin: 0 auto 14px; }
-.logo-halo { position: absolute; width: 200px; height: 110px; border-radius: 50%; background: #417cff26; filter: blur(32px); animation: breathe 5s ease-in-out infinite; }
 #logo { object-fit: contain; opacity: 0; transform: translate(var(--parallax-x, 0px), var(--parallax-y, 0px)); transition: opacity 700ms ease; }
 .static #logo { opacity: 1; transform: none; }
 h1 { margin: 0; font-size: 29px; font-weight: 600; letter-spacing: -.7px; text-shadow: 0 2px 22px #050918; }
@@ -36,7 +34,6 @@ h1 { margin: 0; font-size: 29px; font-weight: 600; letter-spacing: -.7px; text-s
 #interaction { margin: 22px 0 0; color: #8599bd; font-size: 10px; letter-spacing: 1px; }
 .static #interaction { visibility: hidden; }
 .ready #interaction { opacity: 0; }
-@keyframes breathe { 50% { opacity: .45; transform: scale(.88); } }
 @keyframes drift { to { background-position: -250% 0; } }
 @media (max-height: 490px) { .logo-stage { height: 176px; margin-bottom: 8px; } #logo { width: 174px; height: 151px; } #interaction { margin-top: 16px; } }
 @media (max-height: 390px) { .setup { padding: 30px 20px 12px; } .logo-stage { height: 80px; margin-bottom: 6px; } #logo { width: 90px; height: 78px; } h1 { font-size: 23px; } #description { margin: 8px 0 13px; } #footnote { margin-top: 10px; } #interaction { margin-top: 10px; font-size: 9px; } .steps { margin-bottom: 8px; } }

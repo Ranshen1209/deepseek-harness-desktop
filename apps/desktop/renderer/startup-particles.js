@@ -48,8 +48,7 @@ export function startParticles() {
       vx: 0, vy: 0, size: .45 + Math.random() * (kind === 'logo' ? .8 : 1.1),
       color: kind === 'logo' ? (index % 5 === 0 ? 3 : index % 2) : index % colors.length,
       glow: index % (kind === 'logo' ? 13 : 17) === 0,
-      lane: index % 10 < 6 ? 0 : index % 10 < 9 ? 1 : 2,
-      haze: kind === 'cloud' && index % 47 === 0 }
+      lane: index % 10 < 6 ? 0 : index % 10 < 9 ? 1 : 2 }
   }
 
   function resize() {
@@ -217,10 +216,6 @@ export function startParticles() {
         y = centerY + py * fieldSize * .78 * expansion + pointer.tiltY * (5 + p.radius * 9)
         const clearing = 1 - .7 * Math.exp(-(((x - centerX) / 115) ** 2 + ((y - centerY) / 90) ** 2))
         alpha = (.12 + p.radius * .3) * Math.sin(u * Math.PI) ** .4 * clearing * unfurl
-        if (p.haze) {
-          context.globalAlpha = alpha * .12 * entrance
-          context.drawImage(glows[p.color], x - 55, y - 55, 110, 110)
-        }
       } else {
         x = (p.homeX * width + Math.sin(time * .12 + p.phase) * 18 + width) % width
         y = (p.homeY * height - time * (1 + p.radius * 3) + height * 100) % height

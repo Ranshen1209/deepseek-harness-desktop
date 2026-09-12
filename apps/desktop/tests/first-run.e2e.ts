@@ -62,7 +62,7 @@ try {
       await page.screenshot({ path: join(output, `first-run-${language}.png`) })
     }
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    assert.equal(await page.locator('.logo-halo').evaluate(element => getComputedStyle(element).animationName), 'none')
+    assert.equal(await page.locator('#progress').evaluate(element => getComputedStyle(element).animationName), 'none')
     assert.equal(await page.evaluate(async () => {
       const canvas = document.querySelector('#particles') as HTMLCanvasElement
       await new Promise<void>((resolve) => { requestAnimationFrame(() => { resolve() }) })
