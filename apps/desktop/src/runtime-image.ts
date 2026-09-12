@@ -50,7 +50,7 @@ function imageManifest(seed: string, version: string): RuntimeImage {
 
 /**
  * Archive a verified hoisted installation, preserving only relative links to files inside it.
- * @param project - build-owned profile with its final node_modules installation.
+ * @param project - build-owned profile with its final node_modules installation; directory aliases are resolved before traversal.
  * @param version - release version bound to the dependency tree.
  * @param target - platform and architecture of the Node.js runtime that installed the tree.
  * @returns descriptor written next to the archive.
@@ -60,12 +60,13 @@ export async function createRuntimeImage(
   version: string,
   target: { platform: string; arch: string },
 ): Promise<RuntimeImage> {
-  const root = realpathSync(join(project, 'node_modules'))
+  const projectRoot = realpathSync(project)
+  const root = realpathSync(join(projectRoot, 'node_modules'))
   const entries: string[] = []
   const visit = (directory: string): void => {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const path = join(directory, entry.name)
-      const name = relative(project, path).split(sep).join('/')
+      const name = relative(projectRoot, path).split(sep).join('/')
       if (name === 'node_modules/.modules.yaml' || name === 'node_modules/.pnpm-workspace-state-v1.json') continue
       if (!modulePath(name)) throw new Error(`desktop runtime image: invalid path ${name}`)
       if (entry.isDirectory()) visit(path)
@@ -82,9 +83,9 @@ export async function createRuntimeImage(
     }
   }
   visit(root)
-  const archive = join(project, RUNTIME_IMAGE_ARCHIVE)
+  const archive = join(projectRoot, RUNTIME_IMAGE_ARCHIVE)
   // The build-only synchronous writer avoids async pack stalls on pnpm's hardlinked files.
-  create({ cwd: project, file: archive, portable: true, noMtime: true, sync: true }, entries)
+  create({ cwd: projectRoot, file: archive, portable: true, noMtime: true, sync: true }, entries)
   const hash = createHash('sha256')
   let bytes = 0
   for await (const chunk of createReadStream(archive)) {
@@ -94,7 +95,7 @@ export async function createRuntimeImage(
   }
   const image: RuntimeImage = { schemaVersion: 1, version, platform: target.platform, arch: target.arch,
     entries: entries.length, bytes, sha256: hash.digest('hex') }
-  writeFileSync(join(project, RUNTIME_IMAGE_MANIFEST), `${JSON.stringify(image, undefined, 2)}\n`)
+  writeFileSync(join(projectRoot, RUNTIME_IMAGE_MANIFEST), `${JSON.stringify(image, undefined, 2)}\n`)
   return image
 }
 

@@ -29,7 +29,7 @@ Electron 根据应用 locale 选择类型化的中英文字典，并以英文作
 
 ### Seed 安装
 
-发布包同时携带针对目标平台预构建的运行包和离线维护 seed。打包从最终验证过的平铺安装生成运行包；签名 macOS 构建先完成原生文件签名。相对链接只能指向依赖树内部文件；与构建机绑定的 pnpm 元数据、外部链接和目录链接被排除或拒绝。[运行包决策](../../.agents/notes/implemented/architecture/2026-09-11-desktop-runtime-image.zh.md)负责启动和恢复机制的取舍。
+发布包同时携带针对目标平台预构建的运行包和离线维护 seed。打包从最终验证过的平铺安装生成运行包；签名 macOS 构建先完成原生文件签名。遍历和归档路径统一以构建 profile 的真实路径为基准，兼容 macOS 临时目录的路径别名。相对链接只能指向依赖树内部文件；与构建机绑定的 pnpm 元数据、外部链接和目录链接被排除或拒绝。[运行包决策](../../.agents/notes/implemented/architecture/2026-09-11-desktop-runtime-image.zh.md)负责启动和恢复机制的取舍。
 
 | Seed 内容 | 可写目标或用途 |
 |---|---|

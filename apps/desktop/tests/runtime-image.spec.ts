@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -65,6 +65,20 @@ describe('preinstalled desktop runtime', () => {
     bytes[payload] = 'R'.charCodeAt(0)
     writeFileSync(join(seed, RUNTIME_IMAGE_ARCHIVE), bytes)
     await expect(extractRuntimeImage(seed, root(), '1.0.0')).rejects.toThrow(/integrity/u)
+  })
+
+  it('packages a project reached through a directory alias', async () => {
+    const seed = await fixture()
+    const alias = join(root(), 'aliased seed')
+    symlinkSync(seed, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    try {
+      await createRuntimeImage(alias, '1.0.0', process)
+      const destination = root()
+      await extractRuntimeImage(alias, destination, '1.0.0')
+      expect(readFileSync(join(destination, 'node_modules/dependency/index.js'), 'utf8')).toContain('relocated')
+    } finally {
+      unlinkSync(alias)
+    }
   })
 
   it('refuses to unpack over an existing installation', async () => {

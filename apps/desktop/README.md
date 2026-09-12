@@ -29,7 +29,7 @@ Electron chooses typed English or Chinese shell copy from its application locale
 
 ### Seed installation
 
-The release contains a preinstalled, target-specific runtime image and an offline maintenance seed. Packaging creates the image from the final verified hoisted installation, after native signing on signed macOS builds. Relative links must target files inside the dependency tree; machine-specific pnpm metadata, external links, and directory links are excluded or rejected. The [runtime image decision](../../.agents/notes/implemented/architecture/2026-09-11-desktop-runtime-image.md) owns the startup and recovery tradeoffs.
+The release contains a preinstalled, target-specific runtime image and an offline maintenance seed. Packaging creates the image from the final verified hoisted installation, after native signing on signed macOS builds. The build profile's canonical path anchors traversal and archive paths, including when macOS exposes its temporary directory through an alias. Relative links must target files inside the dependency tree; machine-specific pnpm metadata, external links, and directory links are excluded or rejected. The [runtime image decision](../../.agents/notes/implemented/architecture/2026-09-11-desktop-runtime-image.md) owns the startup and recovery tradeoffs.
 
 | Seed content | Writable destination or use |
 |---|---|
