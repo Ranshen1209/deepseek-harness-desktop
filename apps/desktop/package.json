@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
   "description": "Electron desktop shell for a bundled dsh runtime and external plugins",
-  "version": "0.1.6-alpha.1.desktop.1",
+  "version": "0.1.6-alpha.1.desktop.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -46,10 +46,11 @@
     "electron-builder": "^26.15.3",
     "extract-zip": "^2.0.1",
     "js-yaml": "^4.2.0",
-    "pnpm": "11.7.0",
-    "tar": "^7.5.0",
-    "typescript": "^6.0.3",
     "playwright": "^1.49.0",
-    "sharp": "^0.35.3"
+    "png2icons": "2.0.1",
+    "pnpm": "11.7.0",
+    "sharp": "^0.35.3",
+    "tar": "^7.5.0",
+    "typescript": "^6.0.3"
   }
 }
