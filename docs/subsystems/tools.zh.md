@@ -535,7 +535,8 @@ restrict(filter: ToolRestriction): () => void
  * denied. The exact effect disposer is returned for ordered ownership and
  * HMR cleanup.
  * @param guard - synchronous check; a returned string denies the execution.
- * @param stage - prepare consumes approval once; dispatch rechecks revocable policy immediately before each body invocation, after all wrappers.
+ * @param stage - prepare consumes approval once; dispatch rechecks revocable
+ * policy immediately before each body invocation, after all wrappers.
  * @returns the exact disposer that unregisters the guard.
  */
 guard(guard: ToolGuard, stage: 'prepare' | 'dispatch' = 'prepare'): () => void

@@ -33,7 +33,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.17.0
+          node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vitest run apps/desktop/tests/runtime-tree.spec.ts apps/desktop/tests/protection.spec.ts apps/desktop/tests/backend-controller.spec.ts apps/desktop/tests/profile-packages.spec.ts apps/desktop/tests/project-manager.spec.ts apps/desktop/tests/host-process.spec.ts apps/desktop/tests/locale.spec.ts packages/util/native-command/tests/path-opener.spec.ts packages/util/native-command/tests/native-command.spec.ts
@@ -65,7 +65,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.17.0
+          node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vitest run apps/desktop/tests/runtime-tree.spec.ts apps/desktop/tests/protection.spec.ts apps/desktop/tests/backend-controller.spec.ts apps/desktop/tests/profile-packages.spec.ts apps/desktop/tests/project-manager.spec.ts apps/desktop/tests/host-process.spec.ts apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts packages/util/native-command/tests/path-opener.spec.ts packages/util/native-command/tests/native-command.spec.ts
@@ -98,7 +98,7 @@ jobs:
           path: release-artifacts
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.17.0
+          node-version: 24.19.0
       - name: Create GitHub Release and upload installers
         env:
           GH_TOKEN: ${{ github.token }}

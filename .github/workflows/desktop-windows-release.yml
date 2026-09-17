@@ -24,7 +24,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.17.0
+          node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
@@ -50,7 +50,7 @@ jobs:
           path: release-artifacts
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.17.0
+          node-version: 24.19.0
       - name: Create GitHub Release and upload Windows installer
         env:
           GH_TOKEN: ${{ github.token }}

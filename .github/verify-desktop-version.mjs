@@ -9,6 +9,9 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const manifest = file => JSON.parse(readFileSync(resolve(root, file), 'utf8'))
 const version = manifest('package.json').version
 const integrationRoot = 'integrations/auto-mode'
+const desktopHosts = manifest(`${integrationRoot}/compatibility.json`).supportedHosts
+  .filter(host => host.track === 'desktop').map(host => host.version)
+assert.deepEqual(desktopHosts, [version], 'Bundled protection policy must target this exact Desktop version')
 const sourcePin = manifest(`${integrationRoot}/package.json`).sourcePin
 assert.match(sourcePin.commit, /^[a-f0-9]{40}$/)
 assert.equal(sourcePin.lineEndings, 'LF')
