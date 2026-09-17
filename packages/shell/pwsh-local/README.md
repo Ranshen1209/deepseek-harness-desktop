@@ -81,6 +81,8 @@ When a settings provider is composed, this executor registers the capability's s
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+The executor starts without a PowerShell Profile and checks a supplied final-launch authorization after confinement. Its process identity includes resolved argv and environment; changing them invalidates an Auto approval before spawn.
+
 This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

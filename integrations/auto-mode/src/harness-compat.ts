@@ -10,8 +10,14 @@ const { supportedHosts, recommendedHost } = require('../compatibility.json') as 
 /** Reject old/mixed directly resolved API peers before a user turn.
  * The CLI doctor separately audits the full runtime and profile resolution graph. */
 export function assertHarnessCompatibility(): void {
-  const packages = ['dsh-permission-presets', 'dsh-tools', 'dsh-llm', 'dsh-session', 'dsh-user-approval', 'dsh-fs']
+  const packages = ['dsh-permission-presets', 'dsh-tools', 'dsh-llm', 'dsh-session', 'dsh-user-approval', 'dsh-fs', 'dsh-shell', 'dsh-subprocess', 'dsh-sandbox', 'dsh-sandbox-policy']
   const versions = packages.map(name => ({ name, version: require(`@deepseek-ai/${name}/package.json`).version as string }))
+  assertHarnessVersions(versions)
+}
+
+/** Check the resolved cohort; test fixture dependencies are not supported product hosts. */
+export function assertHarnessVersions(versions: readonly { name: string; version: string }[]): void {
+  if (versions.length === 0) throw new Error('Auto Mode: no Harness package identities')
   const version = versions[0]!.version
   if (!supportedHosts.some(host => host.version === version) || versions.some(entry => entry.version !== version)) {
     throw new Error(`Auto Mode: unsupported or mixed Harness packages (${versions.map(entry => `${entry.name}@${entry.version}`).join(', ')}). Install a coherent DeepSeek Harness ${recommendedHost} runtime and restart the profile. Supported exact hosts: ${supportedHosts.map(host => host.version).join(', ')}. Harness 0.1.1-rc.2 uses current(events) and is not supported by this plugin.`)

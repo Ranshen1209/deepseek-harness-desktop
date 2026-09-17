@@ -277,6 +277,20 @@ type FsErrorCode =
 
 `FileSystem` (`ctx.fs`, abstract) owns the provider primitives: `resolve`, `processPath`, `processPathFromHostPath`, `fileUrl`, `contains`, `stat`, `lstat`, `readText`, `streamText`, `readBytes`, `listDir`, `writeText`, and `editText`. `dsh-fs-observation-policy` registers **no service** — it is a plugin that adds policy through the `fs/*` event gate: it decides the write/edit intent waterfalls from unseen/absent/present state and records `FsObservation` values. The executor is `dsh-tool-fs`: it reads/writes/edits through `ctx.fs`, dispatches the waterfalls, and emits the recording event. The generated [`ctx.fs` section](#ctxfs--filesystem-abstract-seam) below shows the exact signatures.
 
+### `SearchPlan`
+
+```ts type-equiv
+/** Fixed native search arguments and final file-identity validation. */
+interface SearchPlan {
+  readonly batches: readonly { argv: readonly string[]; stdin?: string }[]
+  readonly project: (stdout: string) => string
+  readonly beforeSpawn: () => void
+  readonly validate: () => void
+}
+```
+
+A reviewed call may supply verified bytes through fs/read-snapshot or an exact leaf execution policy through fs/execution-policy. Native callers with no listener retain their usual file behavior. SearchPlan supplies bounded stdin snapshots and per-batch validation to native ripgrep. These structured paths do not mediate arbitrary file actions performed inside shell scripts.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -477,6 +491,26 @@ Single-slot decision for the next FileSystem.editText. Calling `next()` yields a
 
 Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
+<a id="fsexecution-policy--waterfall"></a>
+
+#### `fs/execution-policy` — waterfall
+
+Resolve an already-approved tool's exact file policy before mutation.
+
+```ts cordis-catalog
+/**
+ * Resolve an already-approved tool's exact file policy before mutation.
+ * @param actor - opaque tool execution used to validate a per-call file grant.
+ * @param policy - native standing policy; non-participating listeners preserve it.
+ * @mode waterfall
+ */
+'fs/execution-policy'(actor: object, policy: SandboxExecutionPolicy | undefined, next: () => Promise<SandboxExecutionPolicy | undefined>): Promise<SandboxExecutionPolicy | undefined>
+```
+
+Types: [SandboxExecutionPolicy](sandbox.md)
+
+Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+
 <a id="fsobserved--emit"></a>
 
 #### `fs/observed` — emit
@@ -494,6 +528,25 @@ Record an authoritative positive or negative observation. Listeners must be sync
  * @mode emit
  */
 'fs/observed'(target: FsTarget, observation: FsObservation, actor: object | undefined): void
+```
+
+Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+
+<a id="fsread-snapshot--waterfall"></a>
+
+#### `fs/read-snapshot` — waterfall
+
+Supply bytes from the exact reviewed file version.
+
+```ts cordis-catalog
+/**
+ * Supply bytes from the exact reviewed file version.
+ * @param actor - the same-process execution owning the approval.
+ * @param target - provider-resolved file to read.
+ * @param next - remaining readers; undefined preserves native reading.
+ * @mode waterfall
+ */
+'fs/read-snapshot'(actor: object, target: FsTarget, next: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>
 ```
 
 Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
@@ -517,4 +570,28 @@ Single-slot decision for the next FileSystem.writeText. Calling `next()` yields 
 ```
 
 Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+
+<a id="fs-search-events"></a>
+
+### `fs-search/*` events
+
+<a id="fs-searchplan--waterfall"></a>
+
+#### `fs-search/plan` — waterfall
+
+Restrict a native search to inspected files before spawning ripgrep.
+
+```ts cordis-catalog
+/**
+ * Restrict a native search to inspected files before spawning ripgrep.
+ * @param exec - reviewed tool execution.
+ * @param argv - native fixed argument template, including model patterns as data.
+ * @mode waterfall
+ */
+'fs-search/plan'(exec: ToolExecution, argv: readonly string[], next: () => Promise<SearchPlan | undefined>): Promise<SearchPlan | undefined>
+```
+
+Types: [ToolExecution](tools.md)
+
+Source: [`packages/fs/tool-fs-search/src/search-core.ts`](../../packages/fs/tool-fs-search/src/search-core.ts)
 <!-- END GENERATED cordis-surface -->

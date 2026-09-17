@@ -66,17 +66,16 @@ function lineNumbersAt(content: string, offsets: readonly number[]): number[] {
 class MutationPolicy {
   private readonly policy: SandboxPolicyService | undefined
 
-  constructor(ctx: Context) {
+  constructor(private readonly ctx: Context) {
     this.policy = ctx.fs.sandboxMode === undefined ? undefined : ctx.get('sandboxPolicy')
     if (ctx.fs.sandboxMode !== undefined && this.policy === undefined) {
       throw new Error('tool-str-replace-editor: the mounted filesystem confines but ctx.sandboxPolicy is missing')
     }
   }
 
-  resolve(exec: ToolRunContext): SandboxExecutionPolicy | undefined {
-    return this.policy?.resolve({
-      ...exec.agent === undefined ? {} : { session: exec.agent.session },
-    })
+  resolve(exec: ToolRunContext): Promise<SandboxExecutionPolicy | undefined> {
+    const policy = this.policy?.resolve({ ...exec.agent === undefined ? {} : { session: exec.agent.session } })
+    return this.ctx.waterfall('fs/execution-policy', exec, policy, () => Promise.resolve(policy))
   }
 
   mapError(error: unknown, policy: SandboxExecutionPolicy | undefined): unknown {
@@ -232,7 +231,7 @@ async function viewPath(
   if (info.type !== 'file') {
     throw new FsError(`cannot view "${target.displayPath}": not a regular file or directory`, 'FS_NOT_REGULAR_FILE')
   }
-  const content = await ctx.fs.readText(target, exec.signal)
+  const content = await ctx.waterfall('fs/read-snapshot', exec, target, () => Promise.resolve(undefined)).then(snapshot => snapshot === undefined ? ctx.fs.readText(target, exec.signal) : new TextDecoder('utf-8', { fatal: true }).decode(snapshot))
   ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
   return formatFileView(target.displayPath, content, maxOutputChars, viewRange)
 }
@@ -245,7 +244,7 @@ async function createFile(
   exec: ToolRunContext,
 ): Promise<string> {
   const content = requiredForCommand(fileText, 'file_text', 'create')
-  const sandboxPolicy = policy.resolve(exec)
+  const sandboxPolicy = await policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
   if (await ctx.fs.stat(target, exec.signal) !== undefined) {
     throw new Error(`File already exists at: ${target.displayPath}. Cannot overwrite files using command \`create\`.`)
@@ -283,7 +282,7 @@ async function replaceInFile(
   if (newStr === null) {
     throw new Error('Parameter `new_str` must be omitted or contain a string for command: str_replace')
   }
-  const sandboxPolicy = policy.resolve(exec)
+  const sandboxPolicy = await policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
   const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const oldValue = requiredForCommand(oldStr, 'old_str', 'str_replace', false)
@@ -292,7 +291,7 @@ async function replaceInFile(
   if (info.type !== 'file') {
     throw new FsError(`cannot edit "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
   }
-  const before = await ctx.fs.readText(target, exec.signal)
+  const before = await ctx.waterfall('fs/read-snapshot', exec, target, () => Promise.resolve(undefined)).then(snapshot => snapshot === undefined ? ctx.fs.readText(target, exec.signal) : new TextDecoder('utf-8', { fatal: true }).decode(snapshot))
   const offsets = matchOffsets(before, oldValue)
   const offset = offsets[0]
   if (offset === undefined) {
@@ -336,14 +335,14 @@ async function insertInFile(
 ): Promise<string> {
   if (insertLine === undefined) throw new Error('Parameter `insert_line` is required for command: insert')
   const value = requiredForCommand(newStr, 'new_str', 'insert')
-  const sandboxPolicy = policy.resolve(exec)
+  const sandboxPolicy = await policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
   const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const info = await statExisting(ctx, target, 'insert', exec)
   if (info.type !== 'file') {
     throw new FsError(`cannot insert into "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
   }
-  const before = await ctx.fs.readText(target, exec.signal)
+  const before = await ctx.waterfall('fs/read-snapshot', exec, target, () => Promise.resolve(undefined)).then(snapshot => snapshot === undefined ? ctx.fs.readText(target, exec.signal) : new TextDecoder('utf-8', { fatal: true }).decode(snapshot))
   const lines = before.split('\n')
   if (!Number.isInteger(insertLine) || insertLine < 0 || insertLine > lines.length) {
     throw new Error(

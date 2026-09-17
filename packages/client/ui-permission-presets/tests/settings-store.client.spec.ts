@@ -49,6 +49,23 @@ function permissionController(api: object) {
 }
 
 describe('permission settings store', () => {
+  it('acknowledges a legacy default with one revision-bound write even when reselecting the same value', async () => {
+    const schema = { uid: 6, refs: { ...SCHEMA.refs, 4: { type: 'const', value: 'native-preservation-v1' }, 6: { type: 'object', dict: { defaultPreset: 3, semanticsVersion: 4 } } } }
+    const legacy = { ...view('workspace-write', 8, schema), user: { defaultPreset: 'workspace-write' } }
+    const acknowledged = { ...legacy, revision: 9, user: { ...legacy.user, semanticsVersion: 'native-preservation-v1' } }
+    const mutate = vi.fn(() => Promise.resolve(ok(acknowledged)))
+    const { controller } = permissionController({
+      describe: () => Promise.resolve(ok({ writable: true, hasDocument: true, namespaces: [legacy] })), mutate,
+    })
+    await controller.load()
+    expect(controller.store.getSnapshot().migrationPending).toBe(true)
+    await controller.select('workspace-write')
+    expect(mutate).toHaveBeenCalledWith('permission', [
+      { op: 'set', path: ['defaultPreset'], value: 'workspace-write' },
+      { op: 'set', path: ['semanticsVersion'], value: 'native-preservation-v1' },
+    ], 8)
+    expect(controller.store.getSnapshot().migrationPending).toBe(false)
+  })
   it('derives dynamic options and host labels from the descriptor schema', () => {
     expect(resolveDefault(view('read-only'))).toEqual({
       currentValue: 'read-only',

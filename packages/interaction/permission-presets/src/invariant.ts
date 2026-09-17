@@ -3,7 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type { InvariantFailure, InvariantInstaller } from '@deepseek-ai/dsh-invariants'
-import { AUTO_PRESET } from './index.ts'
+import { AUTO_PRESET, CUSTOM_PRESET } from './index.ts'
 
 const PACKAGE_NAME = '@deepseek-ai/dsh-permission-presets'
 
@@ -16,6 +16,7 @@ export const inject = ['invariants']
 function validateEvent(ctx: Context, event: SessionEvent, fail: InvariantFailure): void {
   if (event.type === 'permission/preset'
     && event.data.preset !== AUTO_PRESET
+    && event.data.preset !== CUSTOM_PRESET
     && !ctx.permissionPresets.names.includes(event.data.preset)) {
     fail(`permission/preset names unknown preset ${JSON.stringify(event.data.preset)}`)
   }

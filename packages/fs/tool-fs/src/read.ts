@@ -142,7 +142,8 @@ export function applyReadTool(ctx: Context, caps: ReadToolCaps): void {
 
       // Stream when the file is large OR size is unknown, so a size-less backend
       // never buffers an arbitrarily large file.
-      const chunks = info.size === undefined || info.size >= caps.streamMinSize
+      const snapshot = await ctx.waterfall('fs/read-snapshot', exec, target, () => Promise.resolve(undefined))
+      const chunks = snapshot !== undefined ? [new TextDecoder('utf-8', { fatal: true }).decode(snapshot)] : info.size === undefined || info.size >= caps.streamMinSize
         ? await ctx.fs.streamText(target, exec.signal)
         : [await ctx.fs.readText(target, exec.signal)]
       const window = await buildWindow(

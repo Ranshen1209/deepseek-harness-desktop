@@ -15,6 +15,7 @@ import {
   encodeDesktopRequestEnd,
   encodeDesktopRequestStart,
   type DesktopHostCommand,
+  type DesktopApprovalNotice,
   type DesktopHostEvent,
   type DesktopHostResponseFrame,
 } from './host-protocol.ts'
@@ -100,6 +101,7 @@ export class DesktopHostProcess {
     private readonly inspectPort?: number,
     private readonly environment: NodeJS.ProcessEnv = process.env,
     private readonly onFailure?: (error: Error) => void,
+    private readonly onApproval?: (notice: DesktopApprovalNotice) => void,
   ) {}
 
   /** Start the child once and resolve only after its complete composition is active. */
@@ -297,6 +299,11 @@ export class DesktopHostProcess {
   }
 
   private handleResponseFrame(frame: DesktopHostResponseFrame): void {
+    if (frame.type === 'approval') {
+      try { this.onApproval?.(frame.notice) }
+      catch { console.warn('Desktop approval notification handler failed') }
+      return
+    }
     const pending = this.pending.get(frame.streamId)
     if (pending === undefined) {
       if (frame.streamId >= this.nextStreamId) {

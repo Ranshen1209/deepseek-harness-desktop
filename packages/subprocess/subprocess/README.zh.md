@@ -89,6 +89,8 @@ const output = handle.collected.stdout?.readFrom(0)
 <details>
 <summary>实现细节——点击展开</summary>
 
+hostFileAccess 标识进程路径与宿主文件系统相同的提供者，默认 false；Auto 仅在提供者明确声明后向该执行环境传递已核实的命令或搜索事实。
+
 本节解释 seam 背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中说明。
 
 ### 设计理念

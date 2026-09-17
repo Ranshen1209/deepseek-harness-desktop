@@ -10,7 +10,8 @@ import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { installProtectionGate, protectionFailure } from './protection.ts'
+import { installApprovalNotices } from './approval-notices.ts'
+import { installProtectionGate } from './protection.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import {
@@ -313,16 +314,12 @@ export async function runDesktopHost(
   const ctx = await boot('dsh desktop', rootConfig, structuredClone(composition.patches), async (hostCtx) => {
     current = hostCtx
     installProtectionGate(hostCtx)
+    installApprovalNotices(hostCtx, writeResponse)
     hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
     await hostCtx.plugin(PluginPackages, { generation: resolution })
     provideCmdline(hostCtx, { args: [], exit: () => {} })
   })
   current = ctx
-  const protectionError = protectionFailure(ctx)
-  if (protectionError !== undefined) {
-    await ctx.fiber.dispose()
-    throw new Error(protectionError)
-  }
   const connection = ctx.get('connection')
   const clientModules = ctx.get('clientModules')
   const gateway = ctx.get('typertGateway')

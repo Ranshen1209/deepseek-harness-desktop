@@ -53,6 +53,7 @@ export function createElectronBuilderConfig(
   const buildPaths = desktopTargetBuildPaths(resolveDesktopBuildTarget(env, hostPlatform, hostArch))
   return {
     appId,
+    extraMetadata: { desktopAppId: appId },
     productName: 'DeepSeek Harness',
     artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
     directories: { output: buildPaths.artifacts },
@@ -116,6 +117,8 @@ export function createElectronBuilderConfig(
       target: ['AppImage'],
     },
     nsis: {
+      createStartMenuShortcut: true,
+      shortcutName: 'DeepSeek Harness',
       include: fileURLToPath(new URL('./scripts/installer.nsh', import.meta.url)),
       oneClick: false,
       allowToChangeInstallationDirectory: true,

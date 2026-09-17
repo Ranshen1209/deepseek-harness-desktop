@@ -1,6 +1,6 @@
 {
   "name": "@nanmicoder/dsh-auto-mode",
-  "version": "0.3.0-alpha.5",
+  "version": "0.3.0-alpha.6",
   "description": "Preservation-first, fail-closed permission policy for DeepSeek Harness",
   "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
   "keywords": [
@@ -58,7 +58,11 @@
     "@deepseek-ai/dsh-agent-instructions": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",
-    "@deepseek-ai/dsh-sandbox-policy": "workspace:*"
+    "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
+    "@deepseek-ai/dsh-shell": "workspace:*",
+    "@deepseek-ai/dsh-shell-env": "workspace:*",
+    "@deepseek-ai/dsh-sandbox": "workspace:*",
+    "@deepseek-ai/dsh-subprocess": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
@@ -102,45 +106,62 @@
     },
     "@deepseek-ai/dsh-sandbox-policy": {
       "optional": true
+    },
+    "@deepseek-ai/dsh-shell": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-shell-env": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-sandbox": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-subprocess": {
+      "optional": true
     }
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:*",
-    "koffi": "3.1.1"
+    "koffi": "3.1.1",
+    "picomatch": "4.0.4"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
     "typescript": "^6.0.3",
-    "tsdown": "^0.21.0"
+    "tsdown": "^0.21.0",
+    "@types/picomatch": "4.0.3"
   },
   "license": "MIT",
   "private": true,
   "sourcePin": {
     "repository": "https://github.com/Ranshen1209/dsh-auto-mode",
-    "commit": "478d809ac4170788bd0715fea514078c57556074",
+    "commit": "fd3e39ced93dace4694f6ebdf249efb0f5ae6673",
     "files": {
       "src/artifacts.ts": "0c8383de2dc93e6a8672830db9e9715397148f12b9d9466cf37b9630b0d5de22",
       "src/classifier.ts": "af7306b8943b877763bfcec495daa99d90b1f1934f91b3eead68d2759934964e",
       "src/client/icon-injection.ts": "8d6f49155eaa847e7fdd3e600e0b2e3860e2d0797feb7123733a2b8b16b5d54a",
       "src/client/index.ts": "3adef2178c03da2d7acaa938744af05d8d37b6162d5f207718b6ea46be11a356",
-      "src/client/locales.ts": "c0ddf5a8181e9755d9c042ec09ae233a68c8b720cf9b90f35b5d6b3f13569c59",
+      "src/client/locales.ts": "49980e93841d78fe5aa027bbd6a4c5d45c2bd5a582b63dde1fb36810483c7be2",
       "src/dsh-classifier.ts": "7340c14469743fc95e1480c22e7e5fbdd9c05f051c6b25e661325cdf9fc2e5d5",
       "src/escalation.ts": "58198c44c16750b2a2a87ae1568984da5a19b564055de6c74568b1d6fc7fba56",
-      "src/file-boundary.ts": "6b4a6efd3a3578344206dc67a3cca217fd914cc83797fbc8ed4aaea98196a172",
-      "src/harness-compat.ts": "ffe31c701d36362344fdd4787b4bf92db04a3306e253e178886d745de025d1e8",
-      "src/index.ts": "7a59656277d75d0b24b382337cc7461e24975cec47aa98c812db60f69033dd40",
-      "src/managed-file.ts": "c7a3101bfe979e7b3402df11d61a3d3dd2140cbc67071330560537891f3dc1f2",
-      "src/managed-list.ts": "c74a6b7b09b1fbfe172eb26216745445464a17aa50305062b5877ceea0160274",
+      "src/file-boundary.ts": "4b2fd1ddcaad17ef13efdb485a58ec3ad6ac07ca9c075e9236d121ffa2dc4f52",
+      "src/harness-compat.ts": "af0f5429ff41f329173e2ff52bc9358bb13db57092cb79c2901021be43cb0fa2",
+      "src/index.ts": "189e690227b7bde9649b5cf5876d8f516d47e1b12bd9cafd28a9b2e083636905",
+      "src/managed-file.ts": "f03698bfcbf02a74d19b1c4844bf5d25eb33a43dff0fde28e36bea3c56b8e032",
+      "src/managed-list.ts": "a8bdfd5baca92c998adbb83cfc4c634eb52cd88b4bfeb045854d4b4e4642d08d",
+      "src/native-execution.ts": "bff9ea429e81f35279f56137b108cd1cc27e5e7a32862ef11377f82ec811a61e",
       "src/patch.ts": "2fa9b8d1905ea3ffd2ed52d7420694fd6aea1cb56884ad10e290e5c38133aec1",
       "src/paths.ts": "516e8d7cfc8813db91f0f3839f3bce63f6c0c0d1b1aebe3b12e8f58c68276ef7",
-      "src/policy.ts": "c638ebf5ed9bd940d28ddb10190f4e3fb9f567b0996eb77f1dee56a4a9f4a850",
+      "src/policy.ts": "e74a52445eded53b515a7902e813af5d1fd084248f9600faeba9b427aa8e2bae",
       "src/preserved-move.ts": "faffc5b0852c8b9ef56f7cb4c13d292aedf6ec5701832001218ee6edc7fd2344",
-      "src/probe-registry.ts": "8e446687b4e44025bdbc2ee5c795ad4990b80c3619f42d1c69b411853623f743",
+      "src/probe-registry.ts": "845b294464e7e94cff5ac52ebe269875d7c8643230af695d0ba0c5f5a5fcb752",
+      "src/records.ts": "00b089af51af5b71ea5f7c64b5a40fdced37323ce57b786aff48fa5a703a9487",
       "src/review-audit.ts": "78d34362ca0b946c82855bbb7f542d3b5a89fcf5650064da4fbe12dd6519b5ec",
-      "src/shell.ts": "7b77cfcfb8d3388db5d9941f4ac08356633448145baa3e6a6941dca051571287",
+      "src/search.ts": "c3b41d3f285e4a01655c7d00a385b55d72754a7ebee9b639bcd84140bcadeafe",
+      "src/shell.ts": "45e25c2d8e8cac00a60a3db6a62390aee81dfff9f4f2c9c1b6093a47afec63e0",
       "src/types.ts": "32f78a2642c887b5b41131da5cf3db4276bd2b26795474efe5fc8cd368fc0148",
       "src/upstream-review/LICENSE": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be",
-      "src/upstream-review/index.ts": "9ff682afbd7a5eda84c716dd3a6d3e34759fb07369b646d2a4aebe60966d795c"
+      "src/upstream-review/index.ts": "8bab9fee9a46b6abb223cd2c50b1a506685cc804f189e018be7cd0d8d61f3ba2"
     },
     "lineEndings": "LF"
   }

@@ -252,6 +252,8 @@ interface SubprocessOutcome {
 
 抽象的 [`SubprocessRuntime`](../../packages/subprocess/subprocess/src/index.ts) Service Definition 规定执行世界坐标、可执行文件查找、普通 `spawn` 与 `spawnTerminal`。[`LocalSubprocessRuntime`](../../packages/subprocess/subprocess-local/src/index.ts) 以平台选择的 managed range、按处置方式接线、凭据清除、`node-pty`、平台进程检查，以及先终止再等待退出的资源释放提供这些能力。Service Definition 约定见 [`dsh-subprocess`](../../packages/subprocess/subprocess/README.zh.md)，本地机制见 [`dsh-subprocess-local`](../../packages/subprocess/subprocess-local/README.zh.md)。
 
+hostFileAccess 明确声明该提供者在 Harness 宿主文件系统中执行。本地子进程声明此能力；远程或未核实提供者默认 false。它标识被审核执行事实所对应的文件系统，不保证操作系统隔离。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>

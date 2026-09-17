@@ -14,6 +14,7 @@ import { apply as nodeApply } from '../src/index.ts'
 type ApprovalListener = (
   this: Context,
   request: {
+    id?: string
     toolName: string
     callId?: string
     reason?: string
@@ -31,6 +32,8 @@ interface PluginBench {
   readonly disposeLocale: ReturnType<typeof vi.fn>
   readonly register: ReturnType<typeof vi.fn>
   readonly injectSlot: ReturnType<typeof vi.fn>
+  readonly openSession: ReturnType<typeof vi.fn>
+  readonly focusPending: ReturnType<typeof vi.fn>
   releasePending(): Promise<void>
   registration(): {
     options: {
@@ -77,8 +80,11 @@ function setupPlugin(): PluginBench {
       return () => {}
     },
   } as never)
-  ctx.provide('sessions', { scopeOf } as never)
-  ctx.provide('uiSession', { registerPendingInteraction } as never)
+  const openSession = vi.fn()
+  const focusPending = vi.fn((sessionId: SessionId, key: string) => [...pending.keys()]
+    .some(value => value.sessionId === sessionId && value.key === key))
+  ctx.provide('sessions', { scopeOf, open: openSession } as never)
+  ctx.provide('uiSession', { registerPendingInteraction, focusPendingInteraction: focusPending } as never)
   ctx.provide('slots', { inject: injectSlot, register } as never)
   ctx.provide('locale', {
     register: vi.fn(() => disposeLocale),
@@ -95,6 +101,8 @@ function setupPlugin(): PluginBench {
     disposeLocale,
     register,
     injectSlot,
+    openSession,
+    focusPending,
     async releasePending() {
       const delegates = [...pending.values()]
       pending.clear()
@@ -112,6 +120,33 @@ const id = (value: string): SessionId => value as SessionId
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('Desktop approval navigation without a real Electron window', () => {
+  it('waits for the matching card and cannot answer or revive an ended request', async () => {
+    let navigate!: (target: { requestId: string; sessionId: string }) => void
+    const unsubscribe = vi.fn()
+    vi.stubGlobal('dshDesktop', { onApprovalNavigation: (listener: typeof navigate) => { navigate = listener; return unsubscribe } })
+    const bench = setupPlugin()
+    navigate({ requestId: 'request-1', sessionId: 's1' })
+    expect(bench.openSession).not.toHaveBeenCalled()
+    const scope = createScope(bench.ctx, id('s1'))
+    await scope.fiber.await()
+    const result = bench.listener.call(scope.ctx, { id: 'request-1', toolName: 'bash' }, () => Promise.resolve('unavailable'))
+    const pending = bench.pending.getSnapshot()[0]!
+    expect(bench.openSession).toHaveBeenCalledExactlyOnceWith(id('s1'))
+    navigate({ requestId: 'request-1', sessionId: 'different' })
+    expect(bench.openSession).toHaveBeenCalledTimes(1)
+    expect(bench.pending.getSnapshot()).toHaveLength(1)
+    await pending.answer('rejected')
+    await expect(result).resolves.toBe('rejected')
+    navigate({ requestId: 'request-1', sessionId: 's1' })
+    expect(bench.openSession).toHaveBeenCalledTimes(1)
+    expect(bench.pending.getSnapshot()).toHaveLength(0)
+    await scope.fiber.dispose(); await bench.ctx.fiber.dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
 })
 
 describe('PendingApproval', () => {

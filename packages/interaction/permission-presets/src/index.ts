@@ -71,8 +71,8 @@ export interface PresetSpec {
 }
 
 /**
- * Returned when effective knob values match no available preset. Clients may
- * show it as the current value, but it is never a switch target or event payload.
+ * Returned for unmatched or inconsistent permission settings. A deployment
+ * migration may persist it while awaiting selection; it is never a switch target.
  */
 export const CUSTOM_PRESET = 'custom'
 
@@ -150,10 +150,14 @@ function applyPermissionEvent(
 export interface PermissionSettings {
   /** Preset pinned into a newly created session. */
   defaultPreset: string
+  /** Explicit acknowledgement of a deployment's changed permission semantics. */
+  semanticsVersion?: string
 }
 
 /** The {@link PermissionPresetService} config: preset table and composition default. */
 export interface Config {
+  /** Require confirmation for legacy full/workspace defaults; omitted preserves upstream behavior. */
+  defaultSemanticsVersion?: string
   /**
    * The preset table: name → knob bundle. Defaults to `workspace-write`
    * (workspace-write + ask) and `danger-full-access` (danger-full-access +
@@ -177,6 +181,7 @@ export interface Config {
 export class PermissionPresetService extends TypertRemoteService {
   // Inline schema call: the config catalog walks `static Config` statically.
   static Config: z<Config> = z.object({
+    defaultSemanticsVersion: z.string(),
     presets: z.dict(z.object({
       sandbox: z.union(SANDBOX_MODES as SandboxMode[]).required(),
       approval: z.union(APPROVAL_POLICIES as ApprovalPolicy[]).required(),
@@ -200,9 +205,11 @@ export class PermissionPresetService extends TypertRemoteService {
   private readonly presets: Record<string, PresetSpec>
   private autoAdmit: (() => void) | undefined
   private defaultSettings: () => PermissionSettings
+  private readonly semanticsVersion: string | undefined
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'permissionPresets')
+    this.semanticsVersion = config.defaultSemanticsVersion
     // The schema defaulted the table — the cast records that runtime fact.
     this.presets = config.presets as Record<string, PresetSpec>
     if (CUSTOM_PRESET in this.presets) {
@@ -229,6 +236,7 @@ export class PermissionPresetService extends TypertRemoteService {
     })
     const settingsSchema: z<PermissionSettings> = z.object({
       defaultPreset: z.union(presetChoices).required(),
+      ...(config.defaultSemanticsVersion === undefined ? {} : { semanticsVersion: z.const(config.defaultSemanticsVersion) }),
     })
     ctx.inject(['settings'], (settingsCtx) => {
       settingsCtx.settings.installSection(ctx, PERMISSION_SETTINGS_NAMESPACE, settingsSchema, baseSettings, {
@@ -328,6 +336,9 @@ export class PermissionPresetService extends TypertRemoteService {
    * a mounted settings provider.
    */
   get defaultPreset(): string {
+    const raw = this.ctx.get('settings')?.describe().find(view => view.ns === PERMISSION_SETTINGS_NAMESPACE)?.user as PermissionSettings | undefined
+    if (this.semanticsVersion !== undefined && raw?.defaultPreset !== undefined
+      && ['workspace-write', 'danger-full-access'].includes(raw.defaultPreset) && raw.semanticsVersion !== this.semanticsVersion) return CUSTOM_PRESET
     return this.defaultSettings().defaultPreset
   }
 
@@ -339,9 +350,9 @@ export class PermissionPresetService extends TypertRemoteService {
 
   /**
    * Resolve the preset matching the effective knob values. A still-matching
-   * last selection wins shared-bundle ties; otherwise the first configured
-   * match wins. Returns
-   * {@link CUSTOM_PRESET} when no available preset matches.
+   * last selection wins shared-bundle ties. A mismatching explicit selection
+   * requires reselection; only sessions without one use the first matching
+   * configured bundle. Unmatched settings return {@link CUSTOM_PRESET}.
    * @param session - the session whose knob state is read.
    * @returns the effective preset name, or `custom` when nothing matches.
    */
@@ -351,12 +362,15 @@ export class PermissionPresetService extends TypertRemoteService {
 
   /** Resolve the preset for one folded knob state (the shared mathematics of `current` and the projection unit). */
   private derive(state: KnobState): string {
+    if (state.preset === CUSTOM_PRESET) return CUSTOM_PRESET
     const sandbox = state.sandbox ?? this.ctx.shell.sandboxMode
     const approval = state.approval ?? this.ctx.approval.config.policy ?? 'ask'
     const matches = (spec: PresetSpec): boolean => spec.sandbox === sandbox && spec.approval === approval
     if (state.preset !== null) {
       const spec = this.specOf(state.preset)
       if (spec !== undefined && matches(spec)) return state.preset
+      // Mismatched explicit choices require reselection; old full-access + ask cannot widen silently.
+      if (spec !== undefined) return CUSTOM_PRESET
     }
     for (const [name, spec] of Object.entries(this.presets)) {
       if (matches(spec)) return name
@@ -440,6 +454,13 @@ export class PermissionPresetService extends TypertRemoteService {
     }
     if (preset === null && sandbox === null && approval === null && !seeded) {
       const name = this.defaultPreset
+      if (name === CUSTOM_PRESET) {
+        // Retain the saved setting. This new session waits for an explicit selection.
+        session.append('permission/preset', { preset: CUSTOM_PRESET })
+        setSandboxMode(session, 'read-only')
+        setApprovalPolicy(session, 'ask')
+        return
+      }
       const spec = this.resolve(name)
       session.append('permission/preset', { preset: name })
       setSandboxMode(session, spec.sandbox)

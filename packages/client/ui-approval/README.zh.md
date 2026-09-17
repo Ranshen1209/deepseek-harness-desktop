@@ -40,6 +40,8 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
+Auto 请求可在完整调用详情旁展示模型执行建议、用途、授权依据、范围和后果。桌面通知导航仅选择匹配的活动请求，不作答；原生请求无须模型说明。
+
 无。
 
 </details>

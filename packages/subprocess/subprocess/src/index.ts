@@ -114,6 +114,8 @@ declare module '@deepseek-ai/cordis' {
  *   when the top-level process exits.
  */
 export abstract class SubprocessRuntime extends Service {
+  /** Whether process paths name this Harness host's filesystem. @returns false for remote or unverified execution worlds. */
+  get hostFileAccess(): boolean { return false }
   constructor(ctx: Context) {
     super(ctx, 'subprocess')
   }

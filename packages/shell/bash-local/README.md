@@ -76,6 +76,8 @@ When a settings provider is composed, this executor registers the capability's s
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+The executor checks a supplied final-launch authorization after confinement and before spawning. Resolved argv, environment and working directory contribute to execution identity; background startup settles only after this launch decision.
+
 This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

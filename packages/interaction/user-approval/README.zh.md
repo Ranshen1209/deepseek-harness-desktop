@@ -63,6 +63,8 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
+请求可携带 Auto 执行建议与说明，服务在派发前加入持久化请求 ID。匹配的单次执行授权先被消费，不再发布重复请求，因此已覆盖的扩权不产生新的 asked 事件或通知。
+
 可观察行为已在[使用本包](#use-this-package)中说明；本节解释分发、策略执行与审计路径。
 
 ### 源码地图

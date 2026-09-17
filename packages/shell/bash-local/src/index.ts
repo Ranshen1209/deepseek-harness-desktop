@@ -172,6 +172,12 @@ export class LocalBashExecutor extends ShellExecutor {
     }
   }
 
+  override get launchGuardVersion(): number { return 1 }
+
+  override executionIdentity(spec: ShellExecSpec): string {
+    return JSON.stringify(this.spawnSpec(spec, ['bash', '-c', spec.command], spec.stdoutMaxBytes, undefined))
+  }
+
   /** Map one resolved bash spec and explicit argv onto a fully-specified subprocess spawn. */
   // XXX(stateful-shell): evaluate persistent cwd or PTY sessions when workflows require shell state.
   private spawnSpec(
@@ -249,6 +255,8 @@ export class LocalBashExecutor extends ShellExecutor {
         }
       } finally { d.signal.removeEventListener('abort', abort) }
     } else { argv = argvOrPrepare }
+    d.signal.throwIfAborted()
+    spec.beforeSpawn?.(spec, this)
     const handle = this.ctx.subprocess.spawn(this.spawnSpec(spec, argv, spec.stdoutMaxBytes, d.signal))
     const outcome = await handle.done
     const collected = LocalBashExecutor.collected(handle)
@@ -284,6 +292,7 @@ export class LocalBashExecutor extends ShellExecutor {
   protected startArgv(spec: ShellExecSpec, argv: readonly string[]): ShellProcess {
     // Background runs ignore timeoutMs; callers stop them through kill() or spec.signal.
     spec.signal?.throwIfAborted()
+    spec.beforeSpawn?.(spec, this)
     const running = this.ctx.subprocess.spawn(this.spawnSpec(spec, argv, this.config.maxOutputBytes, spec.signal))
     const collected = LocalBashExecutor.collected(running)
 

@@ -71,6 +71,8 @@ The `permission` settings namespace holds `defaultPreset` for future sessions an
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+Desktop deployments can require a semantics acknowledgement for legacy defaults. Inconsistent explicit preset/knob pairs return custom and await reselection; they never silently select a more permissive preset. Native configurations without that deployment marker retain their defaults.
+
 The observable behavior is covered in [Use this package](#use-this-package); this section explains the write path, the process catalog, the projection-backed current value, and the optional command.
 
 ### Source map

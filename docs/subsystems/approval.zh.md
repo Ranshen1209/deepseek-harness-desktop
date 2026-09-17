@@ -58,6 +58,8 @@ type ApprovalPolicy = 'ask' | 'never'
  * presented tool call, so arguments are not duplicated here.
  */
 interface ApprovalRequest extends ApprovalRequestEvent {
+  /** Optional executor identity used to consume a prior Auto grant before asking. */
+  readonly execution?: ApprovalExecution
   /**
    * The agent on whose behalf the question is asked. Routes the question (a
    * UI answerer only answers for agents it owns) and receives the audit
@@ -87,6 +89,93 @@ interface ApprovalRequest extends ApprovalRequestEvent {
 
 审计事件仅写入日志，不进入模型 transcript（文本记录）。模型可见的行为是调用方派生的工具结果与当前运行时上下文快照。服务 dispose（资源释放）时会移除其上下文贡献；应答者监听器独立地通过 effect 绑定到其所属插件。
 
+### `ApprovalReview`
+
+```ts type-equiv
+/** Complete model explanation attached only to Auto's suggested execution. */
+interface ApprovalReview {
+  readonly recommendation: 'execute'
+  readonly purpose: string
+  readonly authorization: string
+  readonly scope: string
+  readonly consequences: string
+}
+```
+
+### `ApprovalExecution`
+
+```ts type-equiv
+/** Same-process execution identity; never transmitted to an answerer or persisted. */
+interface ApprovalExecution {
+  readonly token: symbol
+  readonly parameters: unknown
+  readonly provider: object
+  readonly workdir: string
+  readonly requestedMode: string
+}
+```
+
+### `ExecutionApprovalRequest`
+
+```ts type-equiv
+/** The executor asks whether an existing per-call authorization covers its exact request. */
+interface ExecutionApprovalRequest {
+  readonly agent: Agent
+  readonly toolName: string
+  readonly callId: ToolCallId
+  readonly execution: ApprovalExecution
+}
+```
+
+### `ApprovalRequestEvent`
+
+```ts type-equiv
+/** Client-safe payload declared for the approval answerer waterfall. */
+interface ApprovalRequestEvent {
+  /** Service-issued request identity, present on dispatched requests. */
+  readonly id?: ApprovalRequestId
+  /** Agent identity projected to the corresponding Client Context in transit. */
+  readonly agent: Agent
+  /** Tool whose operation requires a decision. */
+  readonly toolName: string
+  /** Exact tool call being decided, when available. */
+  readonly callId?: ToolCallId
+  /** Human-readable reason supplied by the asker. */
+  readonly reason?: string
+  /** Model execution recommendation, only supplied by Auto. */
+  readonly review?: ApprovalReview
+  /** Cancellation lifetime of the pending request. */
+  readonly signal?: AbortSignal
+}
+```
+
+### `ReviewExecutionFacts`
+
+```ts type-equiv
+/** Durable facts supplied to a model reviewer, never human authorization. */
+interface ReviewExecutionFacts {
+  readonly file?: {
+    readonly path: string
+    readonly exists: boolean
+    readonly withinWorkspace: boolean
+    readonly recordedVersion: boolean
+    readonly createdBySession: boolean
+  }
+  readonly execution?: {
+    readonly provider: string
+    readonly workdir: string
+    readonly mode: string
+    readonly confinement: string
+    readonly entryFiles: readonly { path: string; content: string }[]
+  }
+  readonly probeDirectories?: readonly string[]
+  readonly newTextProbe?: boolean
+  readonly unchangedTaskProbe?: boolean
+}
+```
+
+Auto 可附带结构化执行建议。同进程执行身份在发布新问题前消费，不进入客户端请求或持久化审计。人工答复只覆盖冻结的调用，调用方仍保留最终参数、提供者和文件校验。新增审核输入和文件提交事件记录核实事实，不是可回放权限。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -113,7 +202,9 @@ setPolicy(agent: Agent, policy: ApprovalPolicy): void
 
 /**
  * Ask the composed answerers to decide one readonly same-process request.
- * The service borrows the request, agent, session, and live signal directly.
+ * The service borrows the agent, session, and live signal and adds an audit id
+ * to the dispatched request. A matching execution grant is consumed before
+ * creating another pending request or notification.
  * The request requires an open turn because the audit pair must be enclosed
  * by the durable log's commit/replay boundary; an idle ask rejects before
  * appending anything. The answerer phase always produces an outcome: an
@@ -146,6 +237,24 @@ Source: [`packages/interaction/user-approval/src/index.ts`](../../packages/inter
 <a id="approval-events"></a>
 
 ### `approval/*` events
+
+<a id="approvalconsume-execution--waterfall"></a>
+
+#### `approval/consume-execution` — waterfall
+
+Consume an exact execution grant before creating a second approval question. Undefined delegates to normal approval; every other outcome is final.
+
+```ts cordis-catalog
+/**
+ * Consume an exact execution grant before creating a second approval question.
+ * Undefined delegates to normal approval; every other outcome is final.
+ * @param req - same-process execution identity supplied by the executor.
+ * @mode waterfall
+ */
+'approval/consume-execution'(req: ExecutionApprovalRequest, next: () => Promise<ApprovalOutcome | undefined>): Promise<ApprovalOutcome | undefined>
+```
+
+Source: [`packages/interaction/user-approval/src/types.ts`](../../packages/interaction/user-approval/src/types.ts)
 
 <a id="approvalrequest--waterfall"></a>
 

@@ -299,12 +299,14 @@ export function parseSimpleCommand(source: string, shell: ShellKind): ParsedComm
 }
 
 
-/** No lexical parser can prove the behavior of installed programs or scripts. */
-export function hardDenyShellReason(_source: string, _shell: ShellKind, _roots: PolicyRoots): string {
-  return 'Auto blocks shell commands, scripts, builds and package lifecycle code: no independently isolated execution broker is available'
+/** Shell syntax is reviewed by the model; confinement is verified against the actual provider. */
+export function hardDenyShellReason(_source: string, _shell: ShellKind, _roots: PolicyRoots): string | undefined {
+  return undefined
 }
 
-/** Legacy signature retained; artifact origin never grants execution. */
-export function assessShell(source: string, shell: ShellKind, roots: PolicyRoots, _artifacts?: ArtifactRegistry, _owner?: object): Assessment {
-  return { decision: 'deny', reason: hardDenyShellReason(source, shell, roots), classifierEligible: false }
+/** Commands require fresh review, never a lexical allow list or artifact-origin grant. */
+export function assessShell(source: string, _shell: ShellKind, _roots: PolicyRoots, _artifacts?: ArtifactRegistry, _owner?: object): Assessment {
+  return source.trim() && source.length <= 1_000_000
+    ? { decision: 'ask', reason: 'Review the complete command, working directory, task authorization and native sandbox mode', classifierEligible: false }
+    : { decision: 'deny', reason: 'shell command is missing or exceeds the complete-call limit', classifierEligible: false }
 }

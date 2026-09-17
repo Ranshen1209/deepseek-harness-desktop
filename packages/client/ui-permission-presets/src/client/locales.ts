@@ -5,7 +5,8 @@ export const PERMISSION_ACCESS_NS = 'permission.access'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'preset.preservation': 'Auto',
+  'migration.required': '旧默认值曾由 Auto 接管。请重新选择并确认默认权限；确认前新会话需要单独选择权限。',
+  'preset.preservation': '自动审批（Auto）',
   'title': '权限',
   'description': '选择新会话的默认权限模式',
   'loading': '加载中',
@@ -25,7 +26,8 @@ export type PermissionSettingsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'preset.preservation': 'Auto',
+  'migration.required': 'Auto previously controlled this saved default. Reselect and confirm its meaning; until then, new sessions require an explicit permission selection.',
+  'preset.preservation': 'Automatic approval (Auto)',
   'title': 'Permission',
   'description': 'Choose the default permission mode for new sessions',
   'loading': 'Loading',
@@ -42,7 +44,9 @@ export const en = {
 
 /** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
-  'preset.preservation': 'Auto',
+  'migration.required': '旧会话的权限标识与执行设置不一致。请重新选择一档权限后继续；现有记录不会被改写。',
+  'preservation.description': '逐次模型审核；命令使用原生工作区沙箱，退出沙箱需允许一次。Windows 沙箱仅提供有限保护。',
+  'preset.preservation': '自动审批（Auto）',
   'mode': '访问模式，当前：{name}',
   'close': '关闭',
   'preset.readOnly': '仅可查看',
@@ -67,7 +71,9 @@ export type PermissionAccessKey = keyof typeof accessZh
 
 /** English dictionary for the current-session popup gate. */
 export const accessEn = {
-  'preset.preservation': 'Auto',
+  'migration.required': 'Saved permission labels and execution settings disagree. Select a permission mode to continue; existing history is retained.',
+  'preservation.description': 'Per-call model review with the native workspace sandbox. Leaving it requires one-time approval. Windows confinement provides limited protection.',
+  'preset.preservation': 'Automatic approval (Auto)',
   'mode': 'Access mode, current: {name}',
   'close': 'Close',
   'preset.readOnly': 'Read Only',

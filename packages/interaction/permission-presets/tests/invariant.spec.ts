@@ -29,6 +29,7 @@ describe('permission invariants', () => {
   it('accepts configured preset events and ignores other session data', async () => {
     const ctx = await setup()
     expect(() => { ctx.emit('session/event', {} as Session, presetEvent('safe')) }).not.toThrow()
+    expect(() => { ctx.emit('session/event', {} as Session, presetEvent('custom')) }).not.toThrow()
     expect(() => { ctx.emit('session/event', {} as Session, {
       type: 'turn/end', seq: SessionSeq(0), time: 0, data: {},
     } as SessionEvent) }).not.toThrow()

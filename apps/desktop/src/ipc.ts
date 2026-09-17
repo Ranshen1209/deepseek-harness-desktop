@@ -6,6 +6,7 @@ import type { DesktopBackendState } from './backend-controller.ts'
 
 /** IPC channel names kept private to the desktop application bundle. */
 export const DESKTOP_IPC = {
+  approvalNavigate: 'dsh-desktop:approval-navigate',
   localeGet: 'dsh-desktop:locale-get',
   pluginsList: 'dsh-desktop:plugins-list',
   pluginsAdd: 'dsh-desktop:plugins-add',
@@ -60,4 +61,10 @@ export interface DshDesktopStartupApi extends Pick<DshDesktopApi, 'protocolVersi
   disablePlugins(): Promise<void>
   restart(): Promise<void>
   resetConfiguration(): Promise<void>
+}
+
+/** Read-only navigation message originating from a live native notification click. */
+export interface DesktopApprovalNavigation {
+  readonly requestId: string
+  readonly sessionId: string
 }

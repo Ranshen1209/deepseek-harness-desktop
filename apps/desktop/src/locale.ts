@@ -1,6 +1,10 @@
 /** Typed English and Chinese copy owned by the Electron shell. */
 
 export const en = {
+  approvalWaiting: 'DeepSeek Harness — approval needed',
+  approvalCommand: 'A command is waiting for your decision. Open the app to review it.',
+  approvalFile: 'A file operation is waiting for your decision. Open the app to review it.',
+  approvalTool: 'An operation is waiting for your decision. Open the app to review it.',
   application: 'Application',
   fileMenu: 'File',
   editMenu: 'Edit',
@@ -59,6 +63,10 @@ export const en = {
 export type DesktopMessages = { readonly [Key in keyof typeof en]: string }
 
 export const zh = {
+  approvalWaiting: 'DeepSeek Harness — 等待审批',
+  approvalCommand: '命令操作等待你确认，点击进入应用查看详情。',
+  approvalFile: '文件操作等待你确认，点击进入应用查看详情。',
+  approvalTool: '工具操作等待你确认，点击进入应用查看详情。',
   application: '应用',
   fileMenu: '文件',
   editMenu: '编辑',

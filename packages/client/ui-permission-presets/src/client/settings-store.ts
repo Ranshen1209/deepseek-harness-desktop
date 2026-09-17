@@ -29,6 +29,7 @@ export interface PermissionDefaultOption {
 
 /** Permission settings-row snapshot. */
 export interface PermissionSettingsState {
+  migrationPending: boolean
   status: 'idle' | 'loading' | 'ready' | 'saving' | 'unavailable' | 'error'
   error: string | null
   writable: boolean
@@ -81,6 +82,7 @@ export function permissionDefaultOf(view: SettingsNamespaceView, schema: Setting
 export class PermissionPresetSettingsController {
   /** Row snapshot consumed through a bound selector hook. */
   readonly store: SnapshotStore<PermissionSettingsState> = createSnapshotStore({
+    migrationPending: false,
     status: 'idle',
     error: null,
     writable: false,
@@ -140,9 +142,11 @@ export class PermissionPresetSettingsController {
     })
     let response
     try {
+      const semantics = this.schema.nodeAtPath(this.schema.rehydrate(view.schema), ['semanticsVersion']) as ConstChoice | undefined
       response = await this.ctx.remote.settings.mutate(
         PERMISSION_SETTINGS_NS,
-        [{ op: 'set', path: ['defaultPreset'], value: preset }],
+        [{ op: 'set', path: ['defaultPreset'], value: preset },
+          ...(semantics?.type === 'const' && typeof semantics.value === 'string' ? [{ op: 'set' as const, path: ['semanticsVersion'], value: semantics.value }] : [])],
         view.revision,
       )
     } finally {
@@ -199,6 +203,8 @@ export class PermissionPresetSettingsController {
     }
     try {
       const resolved = permissionDefaultOf(view, this.schema)
+      const raw = view.user as { defaultPreset?: string; semanticsVersion?: string } | undefined
+      const semantics = this.schema.nodeAtPath(this.schema.rehydrate(view.schema), ['semanticsVersion']) as ConstChoice | undefined
       const { writable } = mirrored.view
       this.store.update((state) => {
         state.status = 'ready'
@@ -207,6 +213,8 @@ export class PermissionPresetSettingsController {
         state.currentValue = resolved.currentValue
         state.options = resolved.options
         state.revision = view.revision
+        state.migrationPending = semantics !== undefined && raw?.defaultPreset !== undefined
+          && ['workspace-write', 'danger-full-access'].includes(raw.defaultPreset) && raw.semanticsVersion !== semantics.value
       })
     } catch (error) {
       this.fail(error)

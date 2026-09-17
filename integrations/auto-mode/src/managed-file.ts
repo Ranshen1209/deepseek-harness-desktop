@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
-import { inspectStructuredPath } from './file-boundary.js'
+import { inspectStructuredPath, readVerifiedFile, sameFileAncestors } from './file-boundary.js'
 import { normalizePath, type PolicyRoots } from './paths.js'
 import { preservedMove } from './preserved-move.js'
 
@@ -32,12 +32,12 @@ export function registerManagedFile(
   rootsFor: (exec: Readonly<ToolExecution>) => PolicyRoots,
   authorize: (exec: ToolExecution) => Promise<ManagedFileAuthorization>,
   policySignal: AbortSignal,
-  recordCreation: (exec: ToolExecution, path: string, identity: string) => void,
+  recordCreation: (exec: ToolExecution, path: string, identity: string, created: boolean, previousIdentity: string) => void,
 ): void {
   const recoveries = new WeakMap<object, Map<string, { path: string; identity: string; sha256: string }>>()
   ctx.tools.register(defineTool({
     name: 'managed_file',
-    description: 'Read, stat, create, edit or reversibly trash one exact regular file, including outside the workspace. Supply an absolute file_path. stat works for absent files. write with create_only:true refuses existing files. For user-authorized write/delete tests choose a new dsh-probe-<at least 8 random letters or digits>.txt in the advertised probe directory; the user need not choose its filename. After trash, verify_recovery with the ORIGINAL path checks this session\'s preserved bytes without accessing arbitrary recovery data. Each operation needs task/model authorization; ambiguous effects ask once. No directories, permanent deletion or shell execution.',
+    description: 'Read, stat, create, edit or reversibly trash one exact regular file, including outside the workspace. Supply an absolute file_path. stat works for absent files. write with create_only:true refuses existing files. For a user-authorized write/delete test choose a new independent file at a reasonable location and use create_only:true; the user may delegate its filename. After trash, verify_recovery with the ORIGINAL path checks this session\'s preserved bytes without accessing arbitrary recovery data. Each operation needs task/model authorization; ambiguous effects ask once. No directories, permanent deletion or shell execution.',
     parameters: {
       operation: { type: 'string', enum: ['read', 'write', 'edit', 'trash', 'stat', 'verify_recovery'], required: true },
       file_path: { type: 'string', required: true },
@@ -61,7 +61,7 @@ export function registerManagedFile(
       const inspected = inspectStructuredPath(args.file_path, roots, mutation, true, allowAbsent)
       const path = inspected.nativePath
       let before: Buffer | undefined
-      try { before = readFileSync(path) }
+      try { before = readVerifiedFile(path, roots, inspected.identity) }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || (!allowAbsent && args.operation !== 'write')) throw error }
       if (args.create_only === true && (args.operation !== 'write' || before !== undefined)) throw Error('create_only requires an absent file')
       let content: string | undefined
@@ -109,12 +109,12 @@ export function registerManagedFile(
         // This call grants the reviewed file leaf; the official provider retains
         // its standard temporary roots. Session workspace and mode are unchanged.
         const outcome = await authorized.fs.writeText(authorized.target, content!, intent, signal, { mode: 'workspace-write', workspaceRoot: path })
-        if (args.create_only === true) {
+        if (content !== undefined) {
           const committed = inspectStructuredPath(path, roots, false, true)
           const info = await authorized.fs.stat(authorized.target, signal)
-          if (info?.version !== outcome.version || inspectStructuredPath(path, roots, false, true).identity !== committed.identity
-            || !readFileSync(path).equals(Buffer.from(content!))) throw Error('Created file changed before probe recording')
-          recordCreation(exec, path, committed.identity)
+          if (info?.version !== outcome.version || !sameFileAncestors(inspected.identity, committed.identity) || inspectStructuredPath(path, roots, false, true).identity !== committed.identity
+            || !readFileSync(path).equals(Buffer.from(content!))) throw Error('File changed before committed-version recording')
+          recordCreation(exec, path, committed.identity, before === undefined, inspected.identity)
         }
         ctx.emit('fs/observed', authorized.target, { kind: 'present', version: outcome.version }, exec)
         return { path, operation: args.operation }

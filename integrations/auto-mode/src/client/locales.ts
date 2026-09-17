@@ -4,9 +4,9 @@ export const AUTO_MODE_LOCALE_NAMESPACE = 'dsh-auto-mode.permission'
 /** Simplified Chinese copy for every plugin-owned permission surface. */
 export const zh = {
   'preset.label': '自动审批',
-  'preset.description': '逐次模型审查风险与授权；普通文件修改自动执行，授权不明时确认。支持精确外部文件和可恢复移除。',
+  'preset.description': '逐次模型审查；文件、搜索和命令使用原生工作区沙箱，需要扩权时单次确认。',
   'dialog.title': '确认启用自动审批？',
-  'dialog.description': 'Auto 每次调用当前模型审查风险与授权；普通文件修改通过后自动执行，授权不明时单次确认。用户委派的外部探针测试可由模型在受限临时目录自行选名，创建后读取、可恢复移除并验证；其他外部修改或原有文件移除需要明确目标或单次确认。移除的原文件保存在 .auto-recovery。永久删除、目录删除、Shell、脚本、安装、构建、未知工具和权限提升仍被阻止。链接、路径别名和敏感配置受到额外限制。该插件只约束启用 Auto 时经过 Harness 工具链的调用，不能替代独立操作系统隔离，也不能防御被篡改的宿主或插件。切换其他模式后这些限制不再适用。',
+  'dialog.description': 'Auto 使用当前模型逐次审查任务授权与风险，支持文件、搜索、Shell、依赖安装、构建和测试。普通已授权操作通过原生工作区写入沙箱执行；授权不明或退出该沙箱时，展示用途、授权依据、范围和后果并请求允许一次。模型拒绝时不弹窗。Windows 原生沙箱仅提供部分写入保护，不能隔离全部读取、联网或外部写入；模型审查不能保证文件绝对安全。结构化移除保留 .auto-recovery 恢复副本，脚本内部删除不享有这一保护。切换模式会撤销等待中的 Auto 调用；其他三档按原生规则运行。',
   'dialog.acknowledge': '我已了解风险，并愿意继续',
   'dialog.cancel': '取消',
   'dialog.confirm': '启用自动审批',
@@ -19,9 +19,9 @@ export type AutoModeLocaleKey = keyof typeof zh
 /** English copy, checked against the Chinese source key set. */
 export const en = {
   'preset.label': 'Auto',
-  'preset.description': 'Fresh model review automates task file changes; unclear authority asks once. Supports exact external files and reversible trash.',
+  'preset.description': 'Per-call model review for files, search and native workspace commands. Wider execution asks once.',
   'dialog.title': 'Enable Auto?',
-  'dialog.description': 'Auto reviews each admissible call with the current model. Approved task file changes run automatically; unclear authority asks once. For a delegated external capability test, the model may choose a new probe filename in the advertised temporary directory and create, read, trash and verify it. Other external mutations or existing-file trash need an exact human target or single-use confirmation. Trash retains the original in .auto-recovery. Permanent deletion, directories, shells, scripts, installs, builds, unknown tools and privilege widening remain blocked. Links, ambiguous paths and sensitive configuration are restricted. This policy covers only Harness tool calls while Auto is active; it cannot replace independent OS isolation or defend against a compromised host or plugin. Other permission modes are outside this protection.',
+  'dialog.description': 'Auto reviews task authorization and risk with the current model for each call. Files, search, Shell, dependency installation, builds and tests use the native workspace-write sandbox. Unclear authority or execution outside that sandbox asks once with purpose, authority, scope and consequences; a model denial does not prompt. The Windows native sandbox offers partial write protection, not complete read, network or external-write isolation. Model review cannot guarantee file safety. Structured trash keeps a recovery copy in .auto-recovery; deletion inside scripts does not. Switching modes cancels pending Auto calls. The other three modes follow native rules.',
   'dialog.acknowledge': 'I understand the risks and want to continue',
   'dialog.cancel': 'Cancel',
   'dialog.confirm': 'Enable Auto',

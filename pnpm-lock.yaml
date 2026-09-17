@@ -616,9 +616,21 @@ importers:
       '@deepseek-ai/dsh-launch-environment':
         specifier: workspace:^
         version: link:../../packages/util/launch-environment
+      '@deepseek-ai/dsh-permission-presets':
+        specifier: workspace:^
+        version: link:../../packages/interaction/permission-presets
+      '@deepseek-ai/dsh-sandbox-policy':
+        specifier: workspace:^
+        version: link:../../packages/sandbox/sandbox-policy
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../packages/core/session
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../packages/core/tools
+      '@deepseek-ai/dsh-user-approval':
+        specifier: workspace:^
+        version: link:../../packages/interaction/user-approval
       '@deepseek-ai/dsh-web-frontend':
         specifier: workspace:^
         version: link:../web
@@ -829,15 +841,27 @@ importers:
       '@deepseek-ai/dsh-permission-presets':
         specifier: workspace:*
         version: link:../../packages/interaction/permission-presets
+      '@deepseek-ai/dsh-sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox/sandbox
       '@deepseek-ai/dsh-sandbox-policy':
         specifier: workspace:*
         version: link:../../packages/sandbox/sandbox-policy
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../packages/core/session
+      '@deepseek-ai/dsh-shell':
+        specifier: workspace:*
+        version: link:../../packages/shell/shell
+      '@deepseek-ai/dsh-shell-env':
+        specifier: workspace:*
+        version: link:../../packages/shell/shell-env
       '@deepseek-ai/dsh-subagent':
         specifier: workspace:*
         version: link:../../packages/subagent/subagent
+      '@deepseek-ai/dsh-subprocess':
+        specifier: workspace:*
+        version: link:../../packages/subprocess/subprocess
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../packages/core/system-prompt
@@ -856,10 +880,16 @@ importers:
       koffi:
         specifier: 3.1.1
         version: 3.1.1
+      picomatch:
+        specifier: 4.0.4
+        version: 4.0.4
     devDependencies:
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.0
+      '@types/picomatch':
+        specifier: 4.0.3
+        version: 4.0.3
       tsdown:
         specifier: ^0.21.0
         version: 0.21.10(oxc-resolver@11.20.0)(publint@0.3.21)(typescript@6.0.3)
@@ -2523,6 +2553,9 @@ importers:
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:^
         version: link:../../typert/protocol
+      '@deepseek-ai/dsh-user-approval':
+        specifier: workspace:^
+        version: link:../../interaction/user-approval
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.31

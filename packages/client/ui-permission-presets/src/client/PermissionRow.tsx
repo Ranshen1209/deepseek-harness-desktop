@@ -61,7 +61,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
   const optionLabel = (option: PermissionSettingsState['options'][number]): string =>
     displayPermissionPreset(option.id, option.label, t)
   const label = selected !== undefined ? optionLabel(selected) : (busy ? t('loading') : t('unavailable'))
-  const description: string = state.error ?? t('description')
+  const description: string = state.error ?? t(state.migrationPending ? 'migration.required' : 'description')
 
   return (
     <>
@@ -77,7 +77,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
           selectedId={state.currentValue}
           onSelect={(id) => {
             setOpen(false)
-            if (id === state.currentValue) return
+            if (id === state.currentValue && !state.migrationPending) return
             if (id === FULL_ACCESS_PRESET) {
               setAcknowledged(false)
               setConfirmingFullAccess(true)

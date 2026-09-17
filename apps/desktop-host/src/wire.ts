@@ -1,7 +1,7 @@
 /** Framed request and response bytes for the Electron Desktop Host transport. */
 
 /** Protocol version shared with the Electron shell. */
-export const DESKTOP_HOST_PROTOCOL_VERSION = 3 as const
+export const DESKTOP_HOST_PROTOCOL_VERSION = 4 as const
 
 /** Child descriptor that receives Electron request frames. */
 export const DESKTOP_REQUEST_PIPE_FD = 3
@@ -25,8 +25,17 @@ const RESPONSE_FRAME_START = 1
 const RESPONSE_FRAME_DATA = 2
 const RESPONSE_FRAME_END = 3
 const RESPONSE_FRAME_ERROR = 4
+const RESPONSE_FRAME_APPROVAL = 5
 type ResponseFrameType = typeof RESPONSE_FRAME_START | typeof RESPONSE_FRAME_DATA
-  | typeof RESPONSE_FRAME_END | typeof RESPONSE_FRAME_ERROR
+  | typeof RESPONSE_FRAME_END | typeof RESPONSE_FRAME_ERROR | typeof RESPONSE_FRAME_APPROVAL
+
+/** Minimal Host-authored notification data; commands, content and credentials never cross this channel. */
+export type DesktopApprovalNotice = {
+  readonly state: 'waiting' | 'ended'
+  readonly requestId: string
+  readonly sessionId: string
+  readonly category: 'command' | 'file' | 'tool'
+}
 
 /** One validated request-pipe frame. */
 export type DesktopHostRequestFrame = {
@@ -61,7 +70,7 @@ function assertStreamId(streamId: number): void {
 }
 
 function encodeFrame(type: ResponseFrameType, streamId: number, payload: Buffer): Buffer {
-  assertStreamId(streamId)
+  if (type !== RESPONSE_FRAME_APPROVAL || streamId !== 0) assertStreamId(streamId)
   const limit = type === RESPONSE_FRAME_DATA ? DESKTOP_PIPE_CHUNK_BYTES : MAX_CONTROL_PAYLOAD_BYTES
   if (payload.byteLength > limit) {
     throw new Error(`dsh desktop: response pipe frame exceeds the ${String(limit)}-byte limit`)
@@ -77,6 +86,11 @@ function encodeFrame(type: ResponseFrameType, streamId: number, payload: Buffer)
 
 function encodeJsonFrame(type: ResponseFrameType, streamId: number, value: unknown): Buffer {
   return encodeFrame(type, streamId, Buffer.from(JSON.stringify(value), 'utf8'))
+}
+
+/** Encode one Host-owned approval lifecycle event on the reserved control stream. */
+export function encodeDesktopApprovalNotice(notice: DesktopApprovalNotice): Buffer {
+  return encodeJsonFrame(RESPONSE_FRAME_APPROVAL, 0, notice)
 }
 
 /** Encode response metadata before any body frames. */

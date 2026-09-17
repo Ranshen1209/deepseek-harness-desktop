@@ -210,6 +210,12 @@ export class PwshLocalExecutor extends ShellExecutor {
     }
   }
 
+  override get launchGuardVersion(): number { return 1 }
+
+  override executionIdentity(spec: ShellExecSpec): string {
+    return JSON.stringify(this.spawnSpec(spec, spec.stdoutMaxBytes, undefined, this.argv(spec)))
+  }
+
   /**
    * The pwsh invocation argv for one resolved spec — the argv-level seam a
    * confining subclass wraps through `ctx.sandbox.confine` (the pwsh twin of
@@ -291,6 +297,8 @@ export class PwshLocalExecutor extends ShellExecutor {
         }
       } finally { d.signal.removeEventListener('abort', abort) }
     } else { argv = argvOrPrepare }
+    d.signal.throwIfAborted()
+    spec.beforeSpawn?.(spec, this)
     const handle = this.ctx.subprocess.spawn(this.spawnSpec(spec, spec.stdoutMaxBytes, d.signal, argv))
     const outcome = await handle.done
     const collected = PwshLocalExecutor.collected(handle)
@@ -318,6 +326,7 @@ export class PwshLocalExecutor extends ShellExecutor {
   protected startArgv(spec: ShellExecSpec, argv: readonly string[]): ShellProcess {
     // Background runs ignore timeoutMs; callers stop them through kill() or spec.signal.
     spec.signal?.throwIfAborted()
+    spec.beforeSpawn?.(spec, this)
     const running = this.ctx.subprocess.spawn(this.spawnSpec(spec, this.config.maxOutputBytes, spec.signal, argv))
     const collected = PwshLocalExecutor.collected(running)
 

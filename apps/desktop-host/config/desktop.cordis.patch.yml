@@ -28,22 +28,28 @@
 
 - id: permission
   config:
-    defaultPreset: preservation
+    defaultPreset: workspace-write
+    defaultSemanticsVersion: native-preservation-v1
     presets:
-      preservation:
-        sandbox: workspace-write
+      read-only:
+        sandbox: read-only
         approval: ask
-        name: Auto
-        description: Model-reviewed task operations run automatically. Unclear authority requires confirmation. Exact external files and reversible single-file trash are supported; unisolated commands and permanent deletion remain blocked.
+        name: read-only
+        description: Read files; changes require one-time approval to widen access.
       workspace-write:
-        name: Auto (legacy workspace)
-        description: 'This saved selection uses Auto: model-reviewed file operations and reversible single-file trash, with confirmation when authority is unclear.'
+        name: workspace-write
+        description: Write inside the workspace and permitted temporary directories; wider retries require approval.
         sandbox: workspace-write
         approval: ask
       danger-full-access:
-        name: Auto (legacy full access)
-        description: This saved selection uses Auto protection. Unisolated commands and permanent deletion remain blocked; it does not grant unrestricted access.
+        name: danger-full-access
+        description: Full file access without approval prompts.
         sandbox: danger-full-access
+        approval: never
+      preservation:
+        name: preservation
+        description: Model review for each call. Commands use the native workspace sandbox; leaving it requires one-time approval. Windows confinement has limited protection.
+        sandbox: workspace-write
         approval: ask
 
 - insert:
@@ -51,7 +57,7 @@
       name: '@nanmicoder/dsh-auto-mode'
       config:
         presetName: preservation
-        enforceAllSessions: true
+        enforceAllSessions: false
         modelReview: true
         reviewTimeoutMs: 120000
 

@@ -40,6 +40,8 @@ None; Session selectors and Slot scopes do not assemble model requests.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
+Pending-interaction focus can prefer an already registered request by session and key. It cannot create, answer or revive a request; notification consumers must still correlate their live request identity.
+
 None.
 
 </details>

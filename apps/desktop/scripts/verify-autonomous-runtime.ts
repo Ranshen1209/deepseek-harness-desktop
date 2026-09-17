@@ -1,6 +1,6 @@
 /**
  * Run the unchanged outside-workspace task with real main/reviewer models in final Electron/ASAR.
- * Usage: DEEPSEEK_API_KEY in the process environment, then
+ * Usage: in a disposable VM, set DSH_ACCEPTANCE_DISPOSABLE_VM=1 and DEEPSEEK_API_KEY in the process environment, then
  * `node --import tsx/esm apps/desktop/scripts/verify-autonomous-runtime.ts win-x64 <new-scratch-directory>`.
  * DSH_ACCEPTANCE_MODEL selects deepseek-flash (default) or deepseek-v4-pro.
  * DSH_ACCEPTANCE_APPROVE=1 enables explicitly labelled supplemental programmatic approval;
@@ -74,7 +74,7 @@ function validate(scratch: string, runtime: string, timedOut: boolean): Record<s
     mainModelIsOfficialAndReal: main.length > 0 && main.every(row => row.provider === 'deepseek-official' && row.model === model),
     reviewModelIsOfficialMax: reviews.length > 0 && reviews.every(row => row.provider === 'deepseek-official' && row.model === model && row.effort === 'max'),
     noHumanApprovalInDefaultMode: supplemental || approvals.length === 0,
-    noTestIsolationDenials: !events.some(row => row.event === 'test-isolation-denial'),
+    autoSelected: sessions.length === 1 && sessions[0]?.preset === 'preservation',
     noToolFailures: calls.length > 0 && calls.every(row => object(row.result).isError === false),
     turnCompleted: !timedOut && existsSync(join(scratch, 'done.json')) && json(join(scratch, 'done.json')).completed === true,
     workspaceSentinelUnchanged: readFileSync(join(scratch, 'user', 'Documents', 'existing-sentinel.txt'), 'utf8') === 'KEEP_WORKSPACE_SENTINEL',
@@ -118,7 +118,7 @@ function validate(scratch: string, runtime: string, timedOut: boolean): Record<s
     node: process.versions.node, runtime, release: readDesktopRuntime(runtime).release,
     counts: { mainRequests: main.length, reviewRequests: reviews.length, toolCalls: calls.length, humanApprovals: approvals.length },
     timedOut, checks, probes,
-    limitations: ['No actual GUI button interaction.', 'No real-user installation or upgrade.', 'Test path guards are not an operating-system sandbox.'],
+    limitations: ['No actual GUI button interaction.', 'No real-user installation or upgrade.', 'No test guard changes the available tools; environment redirection does not isolate the OS. Run in a disposable VM.', 'The native Windows sandbox has partial protection. Command-internal file activity may require manual VM inspection.', 'Automated lifecycle checks cover structured file receipts; arbitrary shell-only lifecycles remain inconclusive, never a false pass.'],
   }
 }
 
@@ -163,6 +163,7 @@ async function runPackaged(runtime: string, scratch: string, observer: string): 
 
 async function main(): Promise<void> {
   const [target, scratchArg, observerArg] = process.argv.slice(2)
+  if (process.env.DSH_ACCEPTANCE_DISPOSABLE_VM !== '1') throw Error('Set DSH_ACCEPTANCE_DISPOSABLE_VM=1 only in a disposable VM')
   if (!process.env.DEEPSEEK_API_KEY) throw Error('Set DEEPSEEK_API_KEY in the process environment; credentials are never accepted as arguments')
   if (!['deepseek-flash', 'deepseek-v4-pro'].includes(process.env.DSH_ACCEPTANCE_MODEL ?? 'deepseek-flash')) throw Error('Select official deepseek-flash or deepseek-v4-pro')
   if (target === '--packaged-child') {
@@ -180,18 +181,25 @@ async function main(): Promise<void> {
   const parent = dirname(scratch)
   if (!existsSync(parent) || realpathSync.native(parent) !== parent || lstatSync(parent).isSymbolicLink()) throw Error('Scratch parent must be an existing real directory')
   const paths = desktopTargetBuildPaths(target)
-  const executable = join(paths.artifacts, 'win-unpacked', 'DeepSeek Harness.exe')
-  const runtime = join(paths.artifacts, 'win-unpacked', 'resources', 'app.asar', 'dsh')
+  const appDirectory = process.env.DSH_ACCEPTANCE_APP_DIRECTORY ?? join(paths.artifacts, 'win-unpacked')
+  const executable = join(appDirectory, 'DeepSeek Harness.exe')
+  const runtime = join(appDirectory, 'resources', 'app.asar', 'dsh')
   if (!existsSync(executable) || !existsSync(dirname(runtime))) throw Error('Build the final packaged Windows application first')
   mkdirSync(scratch, { mode: 0o700 })
-  const { build } = await import('tsdown')
-  await build({
-    config: false, entry: { 'autonomous-acceptance-runner': resolve(import.meta.filename) },
-    outDir: join(scratch, 'runner'), format: ['esm'], platform: 'node', target: 'es2024',
-    dts: false, deps: { neverBundle: ['tsdown'], alwaysBundle: [/.*/u] },
-  })
-  const observer = resolve(import.meta.dirname, '../tests/fixtures/autonomous-acceptance-observer.mjs')
-  const child = spawn(executable, [join(scratch, 'runner', 'autonomous-acceptance-runner.mjs'), '--packaged-child', runtime, scratch, observer], {
+  let runner = resolve(import.meta.filename)
+  if (!runner.endsWith('.mjs')) {
+    const { build } = await import('tsdown')
+    await build({
+      config: false, entry: { 'autonomous-acceptance-runner': runner },
+      outDir: join(scratch, 'runner'), format: ['esm'], platform: 'node', target: 'es2024',
+      dts: false, deps: { neverBundle: ['tsdown'], alwaysBundle: [/.*/u] },
+    })
+    runner = join(scratch, 'runner', 'autonomous-acceptance-runner.mjs')
+  }
+  const bundledObserver = resolve(import.meta.dirname, 'autonomous-acceptance-observer.mjs')
+  const observer = existsSync(bundledObserver) ? bundledObserver
+    : resolve(import.meta.dirname, '../tests/fixtures/autonomous-acceptance-observer.mjs')
+  const child = spawn(executable, [runner, '--packaged-child', runtime, scratch, observer], {
     env: environment(scratch), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
   })
   // Host diagnostics are untrusted and may include provider errors. Retain only

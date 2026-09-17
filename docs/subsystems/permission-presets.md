@@ -27,6 +27,8 @@ interface PresetSpec {
 ```ts type-equiv
 /** The {@link PermissionPresetService} config: preset table and composition default. */
 interface Config {
+  /** Require confirmation for legacy full/workspace defaults; omitted preserves upstream behavior. */
+  defaultSemanticsVersion?: string
   /**
    * The preset table: name → knob bundle. Defaults to `workspace-write`
    * (workspace-write + ask) and `danger-full-access` (danger-full-access +
@@ -74,6 +76,8 @@ interface PresetOption {
 
 `permission/preset` is durable, log-only user intent: it stays out of the model transcript (the knob events own the model-visible consequences through their consumers), and it exists so `current()` can preserve which preset the user chose when two presets share a bundle. The `permissions` projection folds that selection with both knob events and retains the `session/end-seed` boundary used to distinguish a restored empty seed from a fresh session; replay needs no catch-up state or raw-log rescan. A restored `auto` selection requires the live Auto registration before Agent publication. The complete event declaration is in the [persistence log event catalog](../persistence-catalog.md); the method signatures are in the generated [service catalog](#ctxpermissionpresets--permissionpresetservice).
 
+Desktop configures three native permission presets and preservation Auto. Its optional defaultSemanticsVersion requires explicit reselection of inconsistent legacy defaults and preset/knob combinations. The custom marker is a non-executing migration state, and no saved history is rewritten to imply greater permission. Compositions without this marker preserve their native defaults.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -105,9 +109,9 @@ registerAuto(admit: () => void): () => Promise<void>
 
 /**
  * Resolve the preset matching the effective knob values. A still-matching
- * last selection wins shared-bundle ties; otherwise the first configured
- * match wins. Returns
- * {@link CUSTOM_PRESET} when no available preset matches.
+ * last selection wins shared-bundle ties. A mismatching explicit selection
+ * requires reselection; only sessions without one use the first matching
+ * configured bundle. Unmatched settings return {@link CUSTOM_PRESET}.
  * @param session - the session whose knob state is read.
  * @returns the effective preset name, or `custom` when nothing matches.
  */

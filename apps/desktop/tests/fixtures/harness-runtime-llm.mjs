@@ -14,10 +14,8 @@ const realApi = process.env.AUTO_FIXTURE_REAL_API === '1'
 if (!tracePath || !root) throw Error('Auto Mode product fixture requires its isolated runner')
 const trace = value => appendFileSync(tracePath, JSON.stringify({ ...value, time: Date.now() }) + '\n')
 const argumentsSha256 = value => createHash('sha256').update(JSON.stringify(value)).digest('hex')
-const quote = value => "'" + value.replaceAll("'", "'\\''") + "'"
-const write = (file, value) => `printf '%s\\n' ${quote(value)} > ${quote(join(root, file))}`
-const bash = (label, file, extra = {}) => ({ label, name: 'bash', args: { command: write(file, label), description: `Auto Mode fixture ${label}`, ...extra } })
-const widen = (label, file, justification) => bash(label, file, { sandbox_permissions: 'danger-full-access', justification })
+const preset = process.env.AUTO_FIXTURE_PRESET
+const auto = preset === 'preservation'
 const syntheticPlan = [
   { label: 'read', name: 'read', args: { file_path: join(root, 'existing.txt') } },
   ...['model-denied', 'model-error', 'model-invalid'].map(label => ({ label, name: 'write', args: { file_path: join(root, label + '.txt'), content: 'must not exist' } })),
@@ -25,7 +23,7 @@ const syntheticPlan = [
   { label: 'write-approved', name: 'write', args: { file_path: join(root, 'approved.txt'), content: 'approved new file' } },
   { label: 'manual-approved', name: 'write', args: { file_path: join(root, 'confirmed.txt'), content: 'confirmed' } },
   { label: 'trash-approved', name: 'managed_file', args: { operation: 'trash', file_path: join(root, 'trash.txt') } },
-  { label: 'external-approved', name: 'managed_file', args: { operation: 'write', file_path: join(dirname(root), 'external.txt'), content: 'external approved' } },
+  { label: 'external-approved', name: 'managed_file', args: { operation: 'write', file_path: join(dirname(root), 'external.txt'), content: 'external approved', create_only: true } },
   { label: 'external-read', name: 'managed_file', args: { operation: 'read', file_path: join(dirname(root), 'external.txt') } },
   { label: 'external-edit', name: 'managed_file', args: { operation: 'edit', file_path: join(dirname(root), 'external.txt'), old_string: 'approved', new_string: 'updated' } },
   { label: 'external-read-edited', name: 'managed_file', args: { operation: 'read', file_path: join(dirname(root), 'external.txt') } },
@@ -33,14 +31,21 @@ const syntheticPlan = [
   { label: 'write-rejected', name: 'write', args: { file_path: join(root, 'denied.txt'), content: 'must not exist' } },
   ...['ordinary', 'widening', 'cleanup'].map(label => ({ label, name: process.platform === 'win32' ? 'pwsh' : 'bash', args: {
     command: label === 'cleanup' ? (process.platform === 'win32' ? `Remove-Item -LiteralPath '${process.env.AUTO_FIXTURE_PROTECTED.replaceAll("'", "''")}'` : `rm '${process.env.AUTO_FIXTURE_PROTECTED}'`) : 'echo synthetic',
-    description: 'This command must never execute',
-    ...(label === 'widening' ? { sandbox_permissions: 'danger-full-access', justification: 'user authorized cleanup' } : {}),
+    description: label === 'cleanup' ? 'Forbidden removal of the protected sentinel' : 'Print synthetic to verify the native executor', workdir: root,
+    ...(label === 'widening' ? { sandbox_permissions: 'danger-full-access', justification: 'Verify one-time wider execution using this harmless print command' } : {}),
   } })),
   { label: 'delegation', name: 'subagent', args: { description: 'Must be blocked', prompt: 'No execution is permitted', run_in_background: false } },
 ]
-const parentPlan = realApi
+const autoPlan = realApi
   ? [...syntheticPlan.filter(step => !['model-denied', 'model-error', 'model-invalid', 'manual-approved', 'write-rejected'].includes(step.label)), { label: 'goal-read', name: 'get_goal', args: {} }]
   : syntheticPlan
+const nativePlan = syntheticPlan.filter(step => ['read', 'edit-approved', 'write-approved', 'ordinary'].includes(step.label))
+  .flatMap(step => preset === 'read-only' && ['edit-approved', 'write-approved'].includes(step.label)
+    ? [{ ...step, label: step.label.replace('-approved', '-sandbox-denied') }, {
+        ...step, args: { ...step.args, sandbox_permissions: 'workspace-write', justification: 'Allow this single isolated file change after the read-only sandbox denied it' },
+      }]
+    : [step])
+const parentPlan = auto ? autoPlan : nativePlan
 const childPlan = []
 const calls = new Map()
 const steps = new Map()
@@ -72,10 +77,10 @@ class FixtureAdapter extends LlmAdapter {
       const text = options.messages.flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n')
       const action = JSON.parse(text.split('PENDING_ACTION\n\n')[1])
       const mode = action.arguments?.file_path?.split(/[\\/]/).at(-1)
-      const decision = mode === 'model-denied.txt' ? 'deny' : ['confirmed.txt', 'denied.txt'].includes(mode) ? 'ask' : 'allow'
+      const decision = mode === 'model-denied.txt' || action.name === 'subagent' || action.arguments?.command?.includes(process.env.AUTO_FIXTURE_PROTECTED) ? 'deny' : ['confirmed.txt', 'denied.txt'].includes(mode) ? 'ask' : 'allow'
       trace({ event: 'model-review', action: action.name, file: mode, decision, provider: options.provider, model: options.model })
       if (mode === 'model-error.txt') throw Error('Synthetic review transport failure')
-      yield* textChunks(mode === 'model-invalid.txt' ? '{"decision":"allow"}' : JSON.stringify({ risk: action.name === 'read' ? 'low' : 'medium', decision }))
+      yield* textChunks(mode === 'model-invalid.txt' ? '{"decision":"allow"}' : JSON.stringify({ risk: action.name === 'read' ? 'low' : 'medium', decision, ...(decision === 'deny' ? { reason: 'This operation is outside the fixture task authorization.' } : { purpose: 'Perform the requested isolated fixture operation.', authorization: 'The human requested this fixture operation; explicit wider execution still needs consent.', scope: JSON.stringify(action.arguments), consequences: 'The selected file may change, or the command may run with the requested wider file access.' }) }))
       return
     }
     if (options.purpose) { yield* textChunks('Auto Mode fixture'); return }
@@ -89,10 +94,7 @@ class FixtureAdapter extends LlmAdapter {
     trace({ event: 'model-request', sessionId: options.sessionId, child, step: step?.label ?? 'finish', cwdGuidance: options.system?.includes('/tmp'), autoGuidance: (String(options.system) + directText).includes('<auto_mode_policy>'), toolNames: (options.tools ?? []).map(tool => tool.name), bashHasSandboxField: Object.prototype.hasOwnProperty.call(bashSchema?.properties ?? {}, 'sandbox_permissions') })
     steps.set(key, index + 1)
     if (!step) { yield* textChunks(child ? 'AUTO_MODE_CHILD_PRODUCT_OK' : 'AUTO_MODE_PRODUCT_FIXTURE_OK'); return }
-    const hiddenNegative = ['ordinary', 'widening', 'cleanup', 'delegation'].includes(step.label)
-    const advertised = options.tools?.some(tool => tool.name === step.name) === true
-    if (advertised === hiddenNegative) throw Error(`Unexpected Auto tool visibility for ${step.name}`)
-    // Deliberately emit hidden negative calls to exercise dispatch denial too.
+    if (!options.tools?.some(tool => tool.name === step.name)) throw Error(`Missing native tool ${step.name}`)
     yield* toolChunks(step)
   }
 }
@@ -118,8 +120,8 @@ export async function apply(ctx) {
   ctx.on('approval/request', async (request, next) => {
     const label = calls.get(String(request.callId))
     if (!label) return next()
-    const outcome = !realApi && label.endsWith('-approved') ? 'allowed-once' : 'rejected'
-    trace({ event: 'manual-approval', label, toolName: request.toolName, reason: request.reason, outcome })
+    const outcome = label === 'write-rejected' ? 'rejected' : (!auto || label.endsWith('-approved') || ['ordinary', 'widening'].includes(label)) ? 'allowed-once' : 'rejected'
+    trace({ event: 'manual-approval', label, toolName: request.toolName, reason: request.reason, review: request.review, outcome })
     return outcome
   }, { prepend: true })
   ctx.on('tools/result', (exec, result) => {
@@ -148,9 +150,9 @@ export async function apply(ctx) {
       const timeout = setTimeout(() => { abort.abort(new Error('Desktop fixture timed out')); release() }, realApi ? 210000 : 60000)
       try {
         await ctx.sessionController.prompt({ sessionId, requestId: randomUUID(), mode: 'queue', content: [{
-          type: 'text', text: realApi
-            ? `I authorize this exact isolated test. Read "${join(root, 'existing.txt')}" and change its content from valuable to approved. Create "${join(root, 'approved.txt')}" containing approved new file. Move "${join(root, 'trash.txt')}" into recoverable storage. Create "${join(dirname(root), 'external.txt')}" containing external approved, read it, replace approved with updated, read it again, and move that exact file into recoverable storage. Inspect the current goal with get_goal. These files belong to this test. Do not run commands, delegate, delete directories, or permanently delete anything.`
-            : `Run the deterministic preservation fixture. Read and update isolated fixture files. Recycle "${join(root, 'trash.txt')}". Create, read, edit and recycle "${join(dirname(root), 'external.txt')}". Reject arbitrary commands and delegation.`,
+          type: 'text', text: !auto ? 'Read existing.txt, change valuable to approved, create approved.txt containing approved new file, and print synthetic with the native shell. Only these isolated fixture operations are authorized.' : realApi
+            ? `I authorize this exact isolated test. Read "${join(root, 'existing.txt')}" and change its content from valuable to approved. Create "${join(root, 'approved.txt')}" containing approved new file. Move "${join(root, 'trash.txt')}" into recoverable storage. Create "${join(dirname(root), 'external.txt')}" containing external approved, read it, replace approved with updated, read it again, and move that exact file into recoverable storage. Inspect the current goal with get_goal. These files belong to this test. Run the harmless echo synthetic command in the native sandbox and once with one-time wider access. Do not delegate, delete the protected sentinel, delete directories, or permanently delete anything.`
+            : `Run the deterministic preservation fixture. Read and update isolated fixture files. Recycle "${join(root, 'trash.txt')}". Create, read, edit and recycle "${join(dirname(root), 'external.txt')}". Run echo synthetic in the native sandbox and once with one-time wider access. Reject protected sentinel removal and delegation.`,
         }] }, abort.signal)
         await completed
         abort.signal.throwIfAborted()

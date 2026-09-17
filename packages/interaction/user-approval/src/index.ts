@@ -1,3 +1,4 @@
+import type { ApprovalExecution } from './types.ts'
 /**
  * Service Definition for the approval capability seam, covering requests, cancellation, audit, and per-session policy. Missing
  * answerers fail closed; grants apply only to the requested action.
@@ -102,6 +103,8 @@ export function setApprovalPolicy(session: Session, policy: ApprovalPolicy): voi
  * presented tool call, so arguments are not duplicated here.
  */
 export interface ApprovalRequest extends ApprovalRequestEvent {
+  /** Optional executor identity used to consume a prior Auto grant before asking. */
+  readonly execution?: ApprovalExecution
   /**
    * The agent on whose behalf the question is asked. Routes the question (a
    * UI answerer only answers for agents it owns) and receives the audit
@@ -141,6 +144,8 @@ export interface Config {
  * changes to the model through the runtime-context snapshot and switch notices.
  */
 export class ApprovalService extends Service {
+  /** Version of the exact-execution grant handshake supported by this service. */
+  readonly executionApprovalVersion: number = 1
   static Config: z<Config> = z.object({
     policy: z.union(['ask', 'never'] as const).default('ask'),
   })
@@ -189,7 +194,9 @@ export class ApprovalService extends Service {
 
   /**
    * Ask the composed answerers to decide one readonly same-process request.
-   * The service borrows the request, agent, session, and live signal directly.
+   * The service borrows the agent, session, and live signal and adds an audit id
+   * to the dispatched request. A matching execution grant is consumed before
+   * creating another pending request or notification.
    * The request requires an open turn because the audit pair must be enclosed
    * by the durable log's commit/replay boundary; an idle ask rejects before
    * appending anything. The answerer phase always produces an outcome: an
@@ -214,14 +221,31 @@ export class ApprovalService extends Service {
         + 'Ask from inside the turn that needs the decision.',
       )
     }
+    if (req.execution !== undefined && req.callId !== undefined) {
+      req.signal?.throwIfAborted()
+      const covered = await this.ctx.waterfall('approval/consume-execution', {
+        agent: req.agent, toolName: req.toolName, callId: req.callId, execution: req.execution,
+      }, () => Promise.resolve(undefined))
+      req.signal?.throwIfAborted()
+      if (covered !== undefined) return OUTCOMES.includes(covered) ? covered : 'unavailable'
+    }
     const id = ApprovalRequestId(randomUUID())
     session.append('approval/asked', {
       id,
       toolName: req.toolName,
       ...req.callId !== undefined ? { callId: req.callId } : {},
       ...req.reason !== undefined ? { reason: req.reason } : {},
+      ...req.review !== undefined ? { review: req.review } : {},
     })
-    const outcome = await this.decide(req, session)
+    // Only client-safe fields enter the answerer chain. Execution identities
+    // contain symbols and provider instances and remain in the handshake above.
+    const outcome = await this.decide({
+      id, agent: req.agent, toolName: req.toolName,
+      ...req.callId !== undefined ? { callId: req.callId } : {},
+      ...req.reason !== undefined ? { reason: req.reason } : {},
+      ...req.review !== undefined ? { review: req.review } : {},
+      ...req.signal !== undefined ? { signal: req.signal } : {},
+    }, session)
     session.append('approval/decided', { id, outcome })
     return outcome
   }

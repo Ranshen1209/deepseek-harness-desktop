@@ -28,7 +28,7 @@ function ApprovalFlow({ pending, detail, t }: {
     void pending.answer(outcome).catch(() => { setAnswered(false) })
   }
   return (
-    <div className={css.root} data-approval-key={pending.key}>
+    <div className={css.root} data-approval-key={pending.key} data-approval-id={pending.id}>
       <div className={css.card}>
         <div className={css.strip}><span className={css.dot} />{t('waiting')}</div>
         <div
@@ -39,6 +39,13 @@ function ApprovalFlow({ pending, detail, t }: {
           aria-label={t('detail.aria')}
         >
           <div className={css.headline}>{pending.reason ?? t('escalation', { toolName: pending.toolName })}</div>
+          {pending.review !== undefined && <dl>
+            <dt>{t('review.recommendation')}</dt><dd>{t('review.execute')}</dd>
+            <dt>{t('review.purpose')}</dt><dd>{pending.review.purpose}</dd>
+            <dt>{t('review.authorization')}</dt><dd>{pending.review.authorization}</dd>
+            <dt>{t('review.scope')}</dt><dd>{pending.review.scope}</dd>
+            <dt>{t('review.consequences')}</dt><dd>{pending.review.consequences}</dd>
+          </dl>}
           {detail !== null && <div className={css.command}>{detail}</div>}
         </div>
         <div className={css.actionRow}>

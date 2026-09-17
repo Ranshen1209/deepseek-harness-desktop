@@ -1,4 +1,5 @@
 /** Browser approval consumer over the existing scoped Remote Event waterfall. */
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
@@ -38,11 +39,14 @@ async function answerApproval(
   request: ClientApprovalRequest,
   next: ClientApprovalNext,
   registerPendingInteraction: PendingInteractionPublisher<PendingApproval>,
+  onPending: (pending: PendingApproval) => () => void,
 ): Promise<ClientApprovalOutcome> {
   const sessionId = ctx.sessions.scopeOf(owner)
   if (sessionId === undefined) return next()
   const pending = new PendingApproval(sessionId, {
     toolName: request.toolName,
+    ...(request.id === undefined ? {} : { id: request.id }),
+    ...(request.review === undefined ? {} : { review: request.review }),
     ...(request.callId === undefined
       ? {}
       : { callId: request.callId }),
@@ -54,6 +58,7 @@ async function answerApproval(
     pending.delegate()
     await completed.promise
   })
+  const removeNavigation = onPending(pending)
   try {
     try {
       return await pending.result
@@ -62,6 +67,7 @@ async function answerApproval(
       throw error
     }
   } finally {
+    removeNavigation()
     remove()
     completed.resolve()
   }
@@ -87,7 +93,28 @@ export function apply(ctx: ClientContext): void {
       'conversation.approval.detail': { kind: 'single', scope: 'session' },
     },
   }, ApprovalPanel))
+  const pending = new Map<string, PendingApproval>()
+  let requested: { requestId: string; sessionId: string } | undefined
+  const locate = (): void => {
+    if (requested === undefined) return
+    const current = pending.get(requested.requestId)
+    if (current === undefined || current.sessionId !== requested.sessionId) return
+    if (!ctx.uiSession.focusPendingInteraction(current.sessionId, current.key)) return
+    ctx.sessions.open(current.sessionId as SessionId)
+    requested = undefined
+  }
+  const onPending = (value: PendingApproval): (() => void) => {
+    if (value.id !== undefined) pending.set(value.id, value)
+    locate()
+    return () => { if (value.id !== undefined) pending.delete(value.id) }
+  }
+  // The isolated preload exposes only a subscription; pages cannot create notifications or grant approval.
+  const bridge = Reflect.get(globalThis, 'dshDesktop') as { onApprovalNavigation?: (listener: (target: { requestId: string; sessionId: string }) => void) => () => void } | undefined
+  const subscribe = bridge?.onApprovalNavigation
+  if (typeof subscribe === 'function') {
+    ctx.effect(() => subscribe((target) => { requested = target; locate() }), 'ui-approval: desktop navigation')
+  }
   ctx.remote.$on('approval/request', function (request, next) {
-    return answerApproval(ctx, this, request, next, registerPendingInteraction)
+    return answerApproval(ctx, this, request, next, registerPendingInteraction, onPending)
   })
 }

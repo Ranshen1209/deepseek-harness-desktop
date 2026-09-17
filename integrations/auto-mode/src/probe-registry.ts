@@ -1,39 +1,31 @@
-import { dirname, basename } from 'node:path'
-import { lstatSync } from 'node:fs'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { inspectStructuredPath } from './file-boundary.js'
-import { type PolicyRoots } from './paths.js'
+import type { PolicyRoots } from './paths.js'
 
-interface ProbeRecord { readonly identity: string; readonly task: string }
+/** Successfully committed file versions, scoped to the actual Agent; never task authorization. */
+export class FileRecordRegistry {
+  private readonly records = new WeakMap<object, Map<string, { identity: string; created: boolean }>>()
 
-/** Process-local evidence of a successfully created, unchanged text probe; never task authorization. */
-export class ProbeRegistry {
-  private readonly records = new WeakMap<object, Map<string, ProbeRecord>>()
-
-  /** Only new text leaves directly under an actual configured temp directory can be probes. */
-  eligible(path: string, roots: PolicyRoots): boolean {
-    if (!/^dsh-probe-[a-z0-9-]{8,100}\.txt$/i.test(basename(path))) return false
-    const parent = lstatSync(dirname(path), { bigint: true })
-    return roots.tempRoots.some(root => {
-      try { const info = lstatSync(root, { bigint: true }); return info.isDirectory() && !info.isSymbolicLink() && info.ino === parent.ino && info.dev === parent.dev }
-      catch { return false }
-    })
-  }
-
-  /** Record only after a create-if-absent commit succeeded. */
-  remember(exec: ToolExecution, path: string, identity: string, task: string): void {
+  /** Record only after the provider commit and byte/version verification succeed. */
+  remember(exec: ToolExecution, path: string, identity: string, created = false, previousIdentity?: string): void {
     if (!exec.agent) return
-    const records = this.records.get(exec.agent) ?? new Map<string, ProbeRecord>()
-    records.set(path, { identity, task })
+    const records = this.records.get(exec.agent) ?? new Map<string, { identity: string; created: boolean }>()
+    const previous = records.get(path)
+    records.set(path, { identity, created: created || (previous !== undefined && previous.identity === previousIdentity && previous.created) })
     this.records.set(exec.agent, records)
   }
 
-  /** Replaced files, changed tasks and different agents cannot reuse probe evidence. */
-  matches(exec: Readonly<ToolExecution>, path: string, roots: PolicyRoots, task: string): boolean {
+  /** Edits must commit a new version; external replacements and other Agents cannot reuse it. */
+  matches(exec: Readonly<ToolExecution>, path: string, roots: PolicyRoots): boolean {
     if (!exec.agent) return false
     const record = this.records.get(exec.agent)?.get(path)
-    if (!record || record.task !== task) return false
+    if (record === undefined) return false
     try { return record.identity === inspectStructuredPath(path, roots, false, true).identity }
     catch { return false }
   }
+  /** Distinguish a new task file from a user file modified by this Agent. */
+  created(exec: Readonly<ToolExecution>, path: string, roots: PolicyRoots): boolean {
+    return this.matches(exec, path, roots) && this.records.get(exec.agent!)?.get(path)?.created === true
+  }
+
 }

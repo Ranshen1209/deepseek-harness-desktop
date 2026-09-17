@@ -1562,7 +1562,7 @@
       "kind": "event",
       "event": "approval/asked",
       "surface": false,
-      "digest": "3bfeb47b58606f4661904bc723da612782214c463d01e6d61cd6d6193d7374e1",
+      "digest": "52fbb9f07133a77fb34335956bfa727a205466865eef8dbe8b1541b35021936b",
       "schema": {
         "root": 0,
         "nodes": [
@@ -1576,22 +1576,22 @@
               },
               {
                 "name": "ignorable",
-                "type": 3,
+                "type": 5,
                 "optional": true
               },
               {
                 "name": "seq",
-                "type": 4,
+                "type": 6,
                 "optional": false
               },
               {
                 "name": "time",
-                "type": 4,
+                "type": 6,
                 "optional": false
               },
               {
                 "name": "type",
-                "type": 5,
+                "type": 7,
                 "optional": false
               }
             ],
@@ -1616,12 +1616,167 @@
                 "optional": true
               },
               {
+                "name": "review",
+                "type": 3,
+                "optional": true
+              },
+              {
                 "name": "toolName",
                 "type": 2,
                 "optional": false
               }
             ],
             "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "authorization",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "consequences",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "purpose",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "recommendation",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "scope",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "execute"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/asked"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:approval/call-authorized",
+      "kind": "event",
+      "event": "approval/call-authorized",
+      "surface": false,
+      "digest": "488bb08e1eaf13902d28f2608bba77175da5393001004c0d4db545f715d8a56a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "approvedBy",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "callId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "toolName",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "human"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
           },
           {
             "kind": "primitive",
@@ -1637,7 +1792,7 @@
           },
           {
             "kind": "literal",
-            "value": "approval/asked"
+            "value": "approval/call-authorized"
           }
         ]
       }
@@ -1743,6 +1898,106 @@
       }
     },
     {
+      "key": "event:approval/file-committed",
+      "kind": "event",
+      "event": "approval/file-committed",
+      "surface": false,
+      "digest": "0b0643e84067bbf99e6a6846d7bed954a876fa7b4b9e70d49c68750603dea945",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "identityHash",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "created"
+          },
+          {
+            "kind": "literal",
+            "value": "modified"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/file-committed"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:approval/policy",
       "kind": "event",
       "event": "approval/policy",
@@ -1828,6 +2083,202 @@
           {
             "kind": "literal",
             "value": "approval/policy"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:approval/review-input",
+      "kind": "event",
+      "event": "approval/review-input",
+      "surface": false,
+      "digest": "c956bf0eae0d4e2745a9a09cc2dce9af81b0c23a61cb235b9f20551d877c6825",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 10,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "facts",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "execution",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "file",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "newTextProbe",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "probeDirectories",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "unchangedTaskProbe",
+                "type": 8,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "confinement",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryFiles",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 6
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "createdBySession",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "exists",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "recordedVersion",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "withinWorkspace",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/review-input"
           }
         ]
       }
@@ -13789,6 +14240,75 @@
       ]
     },
     {
+      "digest": "033d88de66d6a67ecebe4dcd3c603950ff7064ef0a6f2f340bd6b659973ed861",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "confinement",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "entryFiles",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          }
+        ]
+      },
+      "names": [
+        "event:approval/review-input.data.facts.execution"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:43"
+      ]
+    },
+    {
       "digest": "0341d4c3dfcd53253cdc1e789d9130d3cd848b6f8b0706bf92f313a68b39ff23",
       "schema": {
         "root": 0,
@@ -13828,7 +14348,7 @@
         "packages/interaction/user-approval/src/index.ts#ApprovalPolicy"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/index.ts:60"
+        "packages/interaction/user-approval/src/index.ts:61"
       ]
     },
     {
@@ -14808,6 +15328,106 @@
         ]
       },
       "names": [],
+      "sources": []
+    },
+    {
+      "digest": "0b0643e84067bbf99e6a6846d7bed954a876fa7b4b9e70d49c68750603dea945",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "identityHash",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "created"
+          },
+          {
+            "kind": "literal",
+            "value": "modified"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/file-committed"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/file-committed"
+      ],
       "sources": []
     },
     {
@@ -17481,7 +18101,7 @@
         "event:approval/policy.data"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/index.ts:33"
+        "packages/interaction/user-approval/src/index.ts:34"
       ]
     },
     {
@@ -18822,6 +19442,20 @@
           {
             "kind": "literal",
             "value": "system/message"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "1cd980b41efad86959905c9e347ba3b7d23683feebe606e6d430ff55beec5985",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "human"
           }
         ]
       },
@@ -22512,6 +23146,20 @@
       "sources": [
         "packages/schedule/schedule/src/types.ts:13"
       ]
+    },
+    {
+      "digest": "27e9b87148a76e9073375314b6368ed8db2bf13add4d6c11689ba42c0b54b6d9",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "created"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
     },
     {
       "digest": "287211846beea1eccb5f9acee00d20388a38fcb2e95858fa2332d6f58529379a",
@@ -26966,6 +27614,40 @@
       "sources": []
     },
     {
+      "digest": "334765cf60e2ecaada1813a44dc38a81edd5cc21aacd96f52984ad67d60a0f25",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/review-input.data.facts.execution.entryFiles[0]"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:48"
+      ]
+    },
+    {
       "digest": "335e242de1fcc17b6ca920fc420d71bec2d76e53e37955c00948b65ab77f05c5",
       "schema": {
         "root": 0,
@@ -27967,6 +28649,33 @@
       ]
     },
     {
+      "digest": "38e1f6f32ea20e36d58fdc839c8bd5610705609cc9a7ddd38730e0620ba79c38",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "created"
+          },
+          {
+            "kind": "literal",
+            "value": "modified"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/file-committed.data.source"
+      ],
+      "sources": []
+    },
+    {
       "digest": "390eed1028aba02774f14408647acec10ec5516e97d4f15ecde2b9989d5a69f2",
       "schema": {
         "root": 0,
@@ -28642,91 +29351,6 @@
       ]
     },
     {
-      "digest": "3bfeb47b58606f4661904bc723da612782214c463d01e6d61cd6d6193d7374e1",
-      "schema": {
-        "root": 0,
-        "nodes": [
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "data",
-                "type": 1,
-                "optional": false
-              },
-              {
-                "name": "ignorable",
-                "type": 3,
-                "optional": true
-              },
-              {
-                "name": "seq",
-                "type": 4,
-                "optional": false
-              },
-              {
-                "name": "time",
-                "type": 4,
-                "optional": false
-              },
-              {
-                "name": "type",
-                "type": 5,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "callId",
-                "type": 2,
-                "optional": true
-              },
-              {
-                "name": "id",
-                "type": 2,
-                "optional": false
-              },
-              {
-                "name": "reason",
-                "type": 2,
-                "optional": true
-              },
-              {
-                "name": "toolName",
-                "type": 2,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "primitive",
-            "type": "string"
-          },
-          {
-            "kind": "literal",
-            "value": true
-          },
-          {
-            "kind": "primitive",
-            "type": "number"
-          },
-          {
-            "kind": "literal",
-            "value": "approval/asked"
-          }
-        ]
-      },
-      "names": [
-        "event:approval/asked"
-      ],
-      "sources": []
-    },
-    {
       "digest": "3c2535ca0a2062f172f15344f8040755002b5ac506cf94fc4ebaa822b15feb8c",
       "schema": {
         "root": 0,
@@ -29061,6 +29685,20 @@
           {
             "kind": "literal",
             "value": "image/jpeg"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "40c9101a381cbefac7151d436667c7f798471ba1df4cfbdb824b56aef220e62b",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "approval/file-committed"
           }
         ]
       },
@@ -29656,50 +30294,6 @@
         "event:step/start"
       ],
       "sources": []
-    },
-    {
-      "digest": "45f2a07ea94573123b6ae14db787a40062dec3834f36d8be92c523d40ba28448",
-      "schema": {
-        "root": 0,
-        "nodes": [
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "callId",
-                "type": 1,
-                "optional": true
-              },
-              {
-                "name": "id",
-                "type": 1,
-                "optional": false
-              },
-              {
-                "name": "reason",
-                "type": 1,
-                "optional": true
-              },
-              {
-                "name": "toolName",
-                "type": 1,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "primitive",
-            "type": "string"
-          }
-        ]
-      },
-      "names": [
-        "event:approval/asked.data"
-      ],
-      "sources": [
-        "packages/interaction/user-approval/src/types.ts:44"
-      ]
     },
     {
       "digest": "477614bca595a9e7adb5a1870be446b9a8684f3ba8950259d6289f2d3b74f028",
@@ -30853,6 +31447,121 @@
         ]
       },
       "names": [],
+      "sources": []
+    },
+    {
+      "digest": "488bb08e1eaf13902d28f2608bba77175da5393001004c0d4db545f715d8a56a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "approvedBy",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "callId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "toolName",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "human"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/call-authorized"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/call-authorized"
+      ],
       "sources": []
     },
     {
@@ -33262,6 +33971,33 @@
       ]
     },
     {
+      "digest": "4ebb49508d54760579c12e613635515f950e72aaee942286feb8ba3241e47678",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "human"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/call-authorized.data.approvedBy"
+      ],
+      "sources": []
+    },
+    {
       "digest": "4f507598cf476214aa7646ce7841a7064a9dcb05d0a1eaaefaf79c2b738f160f",
       "schema": {
         "root": 0,
@@ -33984,6 +34720,90 @@
       "sources": []
     },
     {
+      "digest": "5299752d557c6bad8754cd697576a769d66802e9965016f23bd5c90906aa2d52",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "review",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "authorization",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "consequences",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "purpose",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "recommendation",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "scope",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "execute"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/asked.data"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:102"
+      ]
+    },
+    {
       "digest": "529e0ccd0e34079ab4ff21ed87f810cee0388246263bf22e8aba5986b56fae05",
       "schema": {
         "root": 0,
@@ -34038,6 +34858,131 @@
       "sources": [
         "packages/util/values/src/index.ts:4"
       ]
+    },
+    {
+      "digest": "52fbb9f07133a77fb34335956bfa727a205466865eef8dbe8b1541b35021936b",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "review",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "authorization",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "consequences",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "purpose",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "recommendation",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "scope",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "execute"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/asked"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/asked"
+      ],
+      "sources": []
     },
     {
       "digest": "530da6c0267813bb4511af72883cc518834e624e3b3220a7062955fd57a788a6",
@@ -35010,9 +35955,9 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[39].sourceEventSeqs",
-        "SessionEventEnvelope[52].sourceEventSeqs",
+        "SessionEventEnvelope[42].sourceEventSeqs",
         "SessionEventEnvelope[55].sourceEventSeqs",
+        "SessionEventEnvelope[58].sourceEventSeqs",
         "event:assistant/attempt.data.stream[0][0].dt",
         "event:assistant/attempt.data.stream[0][1].dt",
         "event:assistant/attempt.data.stream[0][2].dt",
@@ -35438,6 +36383,145 @@
       ],
       "sources": [
         "packages/subagent/subagent/src/descriptor.ts:61"
+      ]
+    },
+    {
+      "digest": "6003f1c77b718ef31f18716cade08224a38a8663001f258a94fd0ebc073ccc58",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "execution",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "file",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "newTextProbe",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "probeDirectories",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "unchangedTaskProbe",
+                "type": 6,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "confinement",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryFiles",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 4
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "createdBySession",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "exists",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "recordedVersion",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "withinWorkspace",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          }
+        ]
+      },
+      "names": [
+        "packages/interaction/user-approval/src/types.ts#ReviewExecutionFacts"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:35"
       ]
     },
     {
@@ -37001,6 +38085,20 @@
       "sources": [
         "packages/experimental/agent-team/src/types.ts:47"
       ]
+    },
+    {
+      "digest": "6601ceff19c078279a39a5a8d2e7682c0c6bca2670b6554894e37df7f314bb15",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "modified"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
     },
     {
       "digest": "66ece68282d8c06330fb83329a24ae54c386d5ccfab296bbf18369da8beb7d14",
@@ -39052,6 +40150,59 @@
       "sources": []
     },
     {
+      "digest": "76af30bed60db393ef387988ddd022eeff3888c268715f449a8e346ece624f91",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "authorization",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "consequences",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "purpose",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "recommendation",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "scope",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": "execute"
+          }
+        ]
+      },
+      "names": [
+        "packages/interaction/user-approval/src/types.ts#ApprovalReview"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:67"
+      ]
+    },
+    {
       "digest": "77b8491f946edfc8cc77ebae3ba49183759da31ba2dfa83d4c9e9e618c4b91d2",
       "schema": {
         "root": 0,
@@ -39996,6 +41147,65 @@
       ]
     },
     {
+      "digest": "77f66c191c7e0651888e37764acecbbbe492c4238b806ee1c89ee669fdb858e1",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "identityHash",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "created"
+          },
+          {
+            "kind": "literal",
+            "value": "modified"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/file-committed.data"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:62"
+      ]
+    },
+    {
       "digest": "79650cfa10aa3c52440328d85e8a25f0ffadc8d7efd784e3c0819d8bb74a1985",
       "schema": {
         "root": 0,
@@ -40243,7 +41453,7 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[6]"
+        "SessionEventEnvelope[9]"
       ],
       "sources": []
     },
@@ -43594,6 +44804,20 @@
       "sources": []
     },
     {
+      "digest": "9062d7b532613114ff813436907512f59f5d60685bb457830251a34edc0d0571",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "approval/review-input"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "90c811b8c2668898515e69a24e82caffeb08517f9c7aa193867ff0380f3b535d",
       "schema": {
         "root": 0,
@@ -43912,6 +45136,20 @@
       ]
     },
     {
+      "digest": "90df3b9a8f08f4b0c97684f628845e4499aed106eb1c8f6af833ae2e257eb041",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "execute"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "930a6567a10bb62ddd157bd8abdf4b182810c8c3b49d91309b3b009a5fed9731",
       "schema": {
         "root": 0,
@@ -44141,6 +45379,7 @@
         ]
       },
       "names": [
+        "event:approval/review-input.data.facts.probeDirectories",
         "event:assistant/attempt.data.stream[0][0].texts",
         "event:assistant/attempt.data.stream[0][1].texts",
         "event:assistant/attempt.data.stream[0][2].args",
@@ -44208,7 +45447,7 @@
         "event:approval/decided.data"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/types.ts:55"
+        "packages/interaction/user-approval/src/types.ts:114"
       ]
     },
     {
@@ -44284,6 +45523,80 @@
       ],
       "sources": [
         "packages/llm/llm/src/types.ts:426"
+      ]
+    },
+    {
+      "digest": "95533cce5ee7e7f78fce7fd75bdca76faa83805b81a1910b90adeffa194d7a65",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "approvedBy",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "callId",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "fingerprint",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "toolName",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              3
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "human"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/call-authorized.data"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:60"
       ]
     },
     {
@@ -44479,9 +45792,9 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[39]",
-        "SessionEventEnvelope[52]",
-        "SessionEventEnvelope[55]"
+        "SessionEventEnvelope[42]",
+        "SessionEventEnvelope[55]",
+        "SessionEventEnvelope[58]"
       ],
       "sources": []
     },
@@ -50639,6 +51952,161 @@
       "sources": []
     },
     {
+      "digest": "b5dd641b20f3c1a20b0bb6c3d39a1bd447299148dd8ec6d78ee3dd7a3ad870ba",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "facts",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "execution",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "file",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "newTextProbe",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "probeDirectories",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "unchangedTaskProbe",
+                "type": 7,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "confinement",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "entryFiles",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "createdBySession",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "exists",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "recordedVersion",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "withinWorkspace",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "array",
+            "element": 1
+          }
+        ]
+      },
+      "names": [
+        "event:approval/review-input.data"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:58"
+      ]
+    },
+    {
       "digest": "b6ef9c6210be8350cd465f485cf520031fffa6bf3809c61a1e713e834c5982d0",
       "schema": {
         "root": 0,
@@ -52105,7 +53573,7 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[6].surfaceOp[1]"
+        "SessionEventEnvelope[9].surfaceOp[1]"
       ],
       "sources": [
         "packages/core/session/src/types.ts:441"
@@ -54737,6 +56205,202 @@
       ]
     },
     {
+      "digest": "c956bf0eae0d4e2745a9a09cc2dce9af81b0c23a61cb235b9f20551d877c6825",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 10,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 11,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 12,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "callId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "facts",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "execution",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "file",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "newTextProbe",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "probeDirectories",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "unchangedTaskProbe",
+                "type": 8,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "confinement",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "entryFiles",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mode",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "workdir",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 6
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "createdBySession",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "exists",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "recordedVersion",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "withinWorkspace",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "approval/review-input"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/review-input"
+      ],
+      "sources": []
+    },
+    {
       "digest": "c99e20441bf15341e9db54385e558e5c03d21dff2eb1ac08ccbf47c2d8747954",
       "schema": {
         "root": 0,
@@ -56292,6 +57956,42 @@
       "sources": []
     },
     {
+      "digest": "d84bc0fb56efe66addbecdbb98d3276bf9d506ee443b7fe0fd4810e43b866d95",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "array",
+            "element": 1
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/review-input.data.facts.execution.entryFiles"
+      ],
+      "sources": []
+    },
+    {
       "digest": "d8f868c6b3e7189de6c1ffe2ea04794ea2aa31315b6347d12536e46020afac87",
       "schema": {
         "root": 0,
@@ -56807,6 +58507,59 @@
         "event:agent/inbox/spliced.data.inserted[0].source[15].references"
       ],
       "sources": []
+    },
+    {
+      "digest": "dfbd262ca65a1ea5eb98ffbd0316b49a8c4a654d1d50f243503453ca054f8784",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "createdBySession",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "exists",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "path",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "recordedVersion",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "withinWorkspace",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:approval/review-input.data.facts.file"
+      ],
+      "sources": [
+        "packages/interaction/user-approval/src/types.ts:36"
+      ]
     },
     {
       "digest": "dfce5db4aa42b7ebe0bb79eca92553587287e18c06b9eba85cbfb9d332e26acd",
@@ -58441,10 +60194,10 @@
         "SessionEventEnvelope[36]",
         "SessionEventEnvelope[37]",
         "SessionEventEnvelope[38]",
+        "SessionEventEnvelope[39]",
         "SessionEventEnvelope[3]",
         "SessionEventEnvelope[40]",
         "SessionEventEnvelope[41]",
-        "SessionEventEnvelope[42]",
         "SessionEventEnvelope[43]",
         "SessionEventEnvelope[44]",
         "SessionEventEnvelope[45]",
@@ -58455,13 +60208,16 @@
         "SessionEventEnvelope[4]",
         "SessionEventEnvelope[50]",
         "SessionEventEnvelope[51]",
+        "SessionEventEnvelope[52]",
         "SessionEventEnvelope[53]",
         "SessionEventEnvelope[54]",
         "SessionEventEnvelope[56]",
+        "SessionEventEnvelope[57]",
+        "SessionEventEnvelope[59]",
         "SessionEventEnvelope[5]",
+        "SessionEventEnvelope[6]",
         "SessionEventEnvelope[7]",
-        "SessionEventEnvelope[8]",
-        "SessionEventEnvelope[9]"
+        "SessionEventEnvelope[8]"
       ],
       "sources": []
     },
@@ -59480,6 +61236,20 @@
       "names": [
         "event:tool/ptc-dispatch-start"
       ],
+      "sources": []
+    },
+    {
+      "digest": "ed5d3f4de0cde0af21ab77a0ed64023b3c71d6c974e454dc62ef08d0a4ad3b39",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "approval/call-authorized"
+          }
+        ]
+      },
+      "names": [],
       "sources": []
     },
     {

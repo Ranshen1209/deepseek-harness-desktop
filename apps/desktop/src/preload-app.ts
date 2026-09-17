@@ -1,7 +1,7 @@
 /** Startup controls for shell documents; application documents receive only the carrier marker. */
 
 import { contextBridge, ipcRenderer } from 'electron'
-import { DESKTOP_IPC, type DshDesktopStartupApi } from './ipc.ts'
+import { DESKTOP_IPC, type DesktopApprovalNavigation, type DshDesktopStartupApi } from './ipc.ts'
 import type { DesktopBackendState } from './backend-controller.ts'
 
 const startup: DshDesktopStartupApi = {
@@ -21,4 +21,11 @@ const startup: DshDesktopStartupApi = {
 }
 
 contextBridge.exposeInMainWorld('dshDesktop', location.protocol === 'dsh-app:' && location.hostname === 'shell'
-  ? startup : { protocolVersion: 1 })
+  ? startup : {
+    protocolVersion: 1,
+    onApprovalNavigation(listener: (target: DesktopApprovalNavigation) => void) {
+      const handle = (_event: Electron.IpcRendererEvent, target: DesktopApprovalNavigation): void => { listener(target) }
+      ipcRenderer.on(DESKTOP_IPC.approvalNavigate, handle)
+      return () => { ipcRenderer.off(DESKTOP_IPC.approvalNavigate, handle) }
+    },
+  })

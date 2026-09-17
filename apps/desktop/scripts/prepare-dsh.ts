@@ -145,7 +145,12 @@ async function main(): Promise<void> {
           else { process.stdout.write(stdout); accept() }
         })
     })
-    await smokeDesktopRuntime(DSH_OUTPUT_ROOT, NODE, descriptor)
+    if (process.env.DSH_DESKTOP_DEFER_RUNTIME_ACCEPTANCE === '1') {
+      if (process.env.DSH_DESKTOP_UNSIGNED !== '1') throw new Error('Deferring runtime acceptance is limited to local unsigned candidates')
+      process.stdout.write('Desktop Host runtime acceptance DEFERRED to user; this build is not runtime-qualified.\n')
+    } else {
+      await smokeDesktopRuntime(DSH_OUTPUT_ROOT, NODE, descriptor)
+    }
     await verifyDesktopRuntime(DSH_OUTPUT_ROOT, release.version, target)
   } catch (error) {
     rmSync(DSH_OUTPUT_ROOT, { recursive: true, force: true })

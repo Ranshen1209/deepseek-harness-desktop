@@ -63,6 +63,8 @@ The model sees only the asking consumer's eventual tool outcome — allowed, rej
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+A request may carry an Auto execution recommendation and explanation. The service adds the durable request ID before dispatch. A matching single-call execution grant is consumed before another request is published; no new asked event or notification is produced for that covered escalation.
+
 The observable behavior is covered in [Use this package](#use-this-package); this section explains dispatch, policy enforcement, and the audit path.
 
 ### Source map

@@ -40,6 +40,8 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
+待处理交互聚焦可按会话与键优先展示已登记请求，不能创建、答复或复活请求；通知消费者仍须关联活动请求身份。
+
 无。
 
 </details>

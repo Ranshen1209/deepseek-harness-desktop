@@ -84,6 +84,8 @@ Search failures carry the package-owned codes `SEARCH_INVALID_PATTERN` (ripgrep 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+An optional search plan can supply bounded verified content on stdin with validation before spawn and after completion. Native calls without a plan keep their original ripgrep paths and options. Auto excludes binary/invalid UTF-8 files and protects linked or sensitive targets.
+
 This section explains the design decisions behind the search tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

@@ -40,6 +40,18 @@
     },
     {
       "path": "../../packages/fs/fs"
+    },
+    {
+      "path": "../../packages/interaction/permission-presets"
+    },
+    {
+      "path": "../../packages/interaction/user-approval"
+    },
+    {
+      "path": "../../packages/core/session"
+    },
+    {
+      "path": "../../packages/sandbox/sandbox-policy"
     }
   ]
 }

@@ -71,6 +71,8 @@ If no runner can enforce a confined mode, the foreground call fails with `SANDBO
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+Preflight prepares confinement for the complete resolved command without launching it. The local executor rechecks any final-launch authorization after its actual confinement await.
+
 This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

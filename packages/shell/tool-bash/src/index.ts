@@ -214,6 +214,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     justification: string,
     exec: ToolExecution,
     standingPolicy: SandboxExecutionPolicy | undefined,
+    executor: Context['shell'],
   ): Promise<SandboxMode> => {
     if (escalationModes.length === 0) {
       throw new Error('sandbox_permissions is not available in this composition (no sandboxing executor to escalate)')
@@ -227,6 +228,12 @@ export function apply(ctx: Context, config: Config = {}): void {
         callId: exec.callId,
         toolName: 'bash',
         signal: exec.signal,
+        execution: { token: exec.token, parameters: exec.arguments, provider: executor,
+          workdir: executor.resolve({
+            command: String((exec.arguments as { command: string }).command),
+            workdir: resolveWorkdir((exec.arguments as { workdir?: string }).workdir, exec),
+          }).workdir,
+          requestedMode: mode },
       },
     )
   }
@@ -328,10 +335,11 @@ export function apply(ctx: Context, config: Config = {}): void {
     },
     async execute(args: BashToolArgs, exec) {
       validateBashArgs(args)
+      const executor = ctx.shell
       // Description is display metadata; workdir defaults to the caller's session.
       const standingPolicy = resolveSandboxPolicy(exec)
       const approvedMode = args.sandbox_permissions !== undefined && args.justification !== undefined
-        ? await approveBashEscalation(args.sandbox_permissions, args.justification, exec, standingPolicy)
+        ? await approveBashEscalation(args.sandbox_permissions, args.justification, exec, standingPolicy, executor)
         : undefined
       const policy = approvedMode === undefined
         ? standingPolicy
@@ -345,6 +353,8 @@ export function apply(ctx: Context, config: Config = {}): void {
         dshEnv,
         ...policy !== undefined ? { sandboxPolicy: policy } : {},
       }
+      const resolved = executor.resolve({ ...request, signal: exec.signal })
+      const approvedSpec = await ctx.waterfall('shell/authorize', exec, executor, resolved, () => Promise.resolve(resolved))
       if (args.run_in_background === true) {
         // Undeclared keys are allowed, so schema omission also needs enforcement.
         if (!backgroundEnabled) {
@@ -361,21 +371,27 @@ export function apply(ctx: Context, config: Config = {}): void {
           throw error
         }
         // Task preflight finishes before the starter can spawn a process.
+        let started: Promise<import('@deepseek-ai/dsh-shell').ShellProcess> | undefined
         const id = jobs.start({
           kind: 'bash',
           label: args.command,
           ...exec.agent ? { owner: exec.agent } : {},
           run: () => processJob(
-            signal => ctx.shell.start(ctx.shell.resolve({ ...request, signal })),
+            (signal) => {
+              started = executor.start({
+                ...approvedSpec,
+                signal: approvedSpec.beforeSpawn === undefined ? signal : AbortSignal.any([signal, approvedSpec.signal ?? exec.signal]),
+              })
+              return started
+            },
             proc => renderProcessRead(proc.readOutput(), proc.sandbox, escalationModes),
           ),
         })
+        // Auto retains the call ticket until launch preparation has settled.
+        if (approvedSpec.beforeSpawn !== undefined) await started
         return { kind: 'background' as const, jobId: id }
       }
-      const result = await ctx.shell.run(ctx.shell.resolve({
-        ...request,
-        signal: exec.signal,
-      }))
+      const result = await executor.run(approvedSpec)
       if (result.aborted) {
         const error = new HarnessError('tool call aborted', TOOL_ABORTED)
         error.name = 'AbortError'

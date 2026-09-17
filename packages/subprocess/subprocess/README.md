@@ -89,6 +89,8 @@ An executable that cannot be resolved fails loudly with a stable error. A spawn 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+hostFileAccess identifies a provider whose process paths share the host filesystem. It defaults to false; Auto requires a positive provider declaration before passing host-verified command or search facts to that execution world.
+
 This section explains the design decisions behind the seam and points at the code that realizes them; the observable behavior is covered in [Use this package](#use-this-package).
 
 ### Design concept

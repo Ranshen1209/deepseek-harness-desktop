@@ -48,6 +48,22 @@ declare module '@deepseek-ai/cordis' {
 
   interface Events {
     /**
+     * Supply bytes from the exact reviewed file version.
+     * @param actor - the same-process execution owning the approval.
+     * @param target - provider-resolved file to read.
+     * @param next - remaining readers; undefined preserves native reading.
+     * @mode waterfall
+     */
+    'fs/read-snapshot'(actor: object, target: FsTarget, next: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>
+    /**
+     * Resolve an already-approved tool's exact file policy before mutation.
+     * @param actor - opaque tool execution used to validate a per-call file grant.
+     * @param policy - native standing policy; non-participating listeners preserve it.
+     * @mode waterfall
+     */
+    'fs/execution-policy'(actor: object, policy: SandboxExecutionPolicy | undefined, next: () => Promise<SandboxExecutionPolicy | undefined>): Promise<SandboxExecutionPolicy | undefined>
+
+    /**
      * Single-slot decision for the next {@link FileSystem.writeText}. Calling
      * `next()` yields the bare provider's unconditional write; the first listener
      * that returns an intent owns the decision rather than composing with peers.

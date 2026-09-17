@@ -7,7 +7,7 @@ import { isCriticalPath, isProtectedProjectPath, sensitiveReadPath, type PolicyR
 
 /** Validate a directory through its ancestors without following links or traversing it. */
 export function inspectDirectory(input: string, roots: PolicyRoots): { path: string; identity: string } {
-  const directory = inspectStructuredPath(input, roots, false, false, false, true)
+  const directory = inspectStructuredPath(input, roots, false, true, false, true)
   if (isProtectedProjectPath(directory.nativePath, roots) || sensitiveReadPath(directory.nativePath)) throw Error('Protected directory cannot be listed')
   return { path: directory.nativePath, identity: directory.identity }
 }
@@ -16,7 +16,7 @@ export function inspectDirectory(input: string, roots: PolicyRoots): { path: str
 export function registerManagedList(ctx: Context, rootsFor: (exec: Readonly<ToolExecution>) => PolicyRoots): void {
   ctx.tools.register(defineTool({
     name: 'managed_list',
-    description: 'List up to 200 entries in one workspace directory, without running a command or following links. Protected metadata, credential paths, links and hard-linked files are omitted. Use returned subdirectories for bounded navigation and structured reads for content. Optional contains is a literal case-sensitive filename filter, never a pattern or script.',
+    description: 'List up to 200 entries in one ordinary directory, without running a command or following links. Protected metadata, credential paths, links and hard-linked files are omitted. Use returned subdirectories for bounded navigation and structured reads for content. Optional contains is a literal case-sensitive filename filter, never a pattern or script.',
     parameters: { directory: { type: 'string', required: true }, contains: { type: 'string' } },
     output: { schema: { type: 'object', additionalProperties: false, properties: {
       directory: { type: 'string', required: true }, entries: { type: 'array', items: { type: 'string' }, required: true }, truncated: { type: 'boolean', required: true },

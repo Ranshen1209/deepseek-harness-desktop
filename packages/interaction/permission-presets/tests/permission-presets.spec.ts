@@ -59,11 +59,20 @@ async function mountAuto(ctx: Context, admit: () => void = () => {}) {
   }, { inject: ['permissionPresets'] }))
 }
 
-async function mountedStore(options: { approvalDefault?: ApprovalPolicy | undefined } = {}): Promise<Context> {
+async function mountedStore(options: {
+  approvalDefault?: ApprovalPolicy | undefined
+  config?: Config
+  saved?: Record<string, unknown>
+} = {}): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
-  await ctx.plugin(MemorySettings)
+  await ctx.plugin(class extends MemorySettings {
+    protected override load(): Promise<Record<string, unknown>> {
+      if (options.saved !== undefined) this.doc.permission = structuredClone(options.saved)
+      return super.load()
+    }
+  })
   ctx.provide('shell', {
     sandboxMode: 'workspace-write',
     resolve() { throw new Error('permission tests do not execute bash') },
@@ -73,7 +82,7 @@ async function mountedStore(options: { approvalDefault?: ApprovalPolicy | undefi
   ctx.provide('approval', {
     config: { policy: 'approvalDefault' in options ? options.approvalDefault : 'ask' },
   })
-  await ctx.plugin(PermissionPresetService, {})
+  await ctx.plugin(PermissionPresetService, options.config ?? {})
   return ctx
 }
 
@@ -223,7 +232,7 @@ describe('PermissionPresetService', () => {
     expect(ctx.permissionPresets.current(session)).toBe(CUSTOM_PRESET)
   })
 
-  it('the fold breaks bundle ties; a stale fold no longer matching falls back to table order', async () => {
+  it('the fold breaks bundle ties; mismatching explicit intent requires a fresh selection', async () => {
     const ctx = await mounted({ config: { presets: {
       'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
       agentish: { sandbox: 'workspace-write', approval: 'ask' },
@@ -234,7 +243,7 @@ describe('PermissionPresetService', () => {
     expect(ctx.permissionPresets.current(session)).toBe('agentish')
     session.append('approval/policy', { policy: 'never' })
     session.append('sandbox/mode', { mode: 'danger-full-access' })
-    expect(ctx.permissionPresets.current(session)).toBe('danger-full-access')
+    expect(ctx.permissionPresets.current(session)).toBe(CUSTOM_PRESET)
   })
 
   it('set() writes through: one preset event plus both knob events', async () => {
@@ -309,6 +318,39 @@ describe('PermissionPresetService', () => {
 })
 
 describe('new-session default', () => {
+  const desktopConfig: Config = {
+    defaultPreset: 'workspace-write', defaultSemanticsVersion: 'native-preservation-v1',
+    presets: {
+      'read-only': { sandbox: 'read-only', approval: 'ask' },
+      'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
+      'danger-full-access': { sandbox: 'danger-full-access', approval: 'never' },
+      preservation: { sandbox: 'workspace-write', approval: 'ask' },
+    },
+  }
+  it('keeps the native workspace default for a new user without a stored override', async () => {
+    const ctx = await mountedStore({ config: desktopConfig })
+    expect(ctx.permissionPresets.defaultPreset).toBe('workspace-write')
+    expect(ctx.permissionPresets.current(ctx.sessions.create(SessionId('fresh-desktop')))).toBe('workspace-write')
+  })
+  it.each(['workspace-write', 'danger-full-access'])('does not reinterpret the legacy saved %s default', async (defaultPreset) => {
+    const ctx = await mountedStore({ config: desktopConfig, saved: { defaultPreset } })
+    expect(ctx.permissionPresets.defaultPreset).toBe(CUSTOM_PRESET)
+    const session = ctx.sessions.create(SessionId('legacy-default'))
+    expect(ctx.permissionPresets.current(session)).toBe(CUSTOM_PRESET)
+    expect(session.snapshotEvents().find(event => event.type === 'sandbox/mode')?.data).toEqual({ mode: 'read-only' })
+    expect(ctx.settings.describe().find(view => view.ns === PERMISSION_SETTINGS_NAMESPACE)?.user).toEqual({ defaultPreset })
+    await ctx.settings.update(PERMISSION_SETTINGS_NAMESPACE, { defaultPreset, semanticsVersion: 'native-preservation-v1' })
+    expect(ctx.permissionPresets.defaultPreset).toBe(defaultPreset)
+    expect(ctx.permissionPresets.current(session)).toBe(CUSTOM_PRESET)
+    ctx.permissionPresets.set(session, defaultPreset)
+    expect(ctx.permissionPresets.current(session)).toBe(defaultPreset)
+    const resumed = await mountedStore({ config: desktopConfig, saved: { defaultPreset, semanticsVersion: 'native-preservation-v1' } })
+    expect(resumed.permissionPresets.defaultPreset).toBe(defaultPreset)
+  })
+  it.each(['preservation', 'read-only'])('preserves an unambiguous saved %s default', async (defaultPreset) => {
+    const ctx = await mountedStore({ config: desktopConfig, saved: { defaultPreset } })
+    expect(ctx.permissionPresets.current(ctx.sessions.create(SessionId('retained-default')))).toBe(defaultPreset)
+  })
   it('rejects persisted Auto before publication when its integration is absent', async () => {
     const ctx = await mounted()
     const source = freshSession('auto-source')

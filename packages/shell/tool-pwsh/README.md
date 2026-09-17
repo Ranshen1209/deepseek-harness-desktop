@@ -69,6 +69,8 @@ A composition with no PowerShell executor never activates the tool, and the inje
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+Auto authorization uses the captured executor and resolved command. A wider retry carries the same call identity to approval consumption. Background calls with a launch guard remain pending until guarded startup completes; native calls without that guard retain their usual behavior.
+
 This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy

@@ -126,6 +126,7 @@ function assertPositiveInteger(name: string, value: number): void {
  */
 // oxlint-disable-next-line typescript/require-await -- async keeps a load-time config rejection a rejection, not a synchronous throw
 export async function apply(ctx: Context, config: Config): Promise<void> {
+  ctx.provide('fileSearchAccessVersion', 1)
   // schemastery (Config) has already filled every defaulted field.
   const resolved = config as ResolvedConfig
   assertPositiveInteger('globMaxResults', resolved.globMaxResults)

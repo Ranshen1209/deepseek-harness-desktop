@@ -86,6 +86,15 @@ export class SandboxBashExecutor extends LocalBashExecutor {
     return { ...super.resolve(request), sandboxPolicy: request.sandboxPolicy ?? this.ctx.sandboxPolicy.resolve() }
   }
 
+  override async preflight(spec: ShellExecSpec): Promise<{ mode: string; enforcement: string }> {
+    spec.signal?.throwIfAborted()
+    const policy = spec.sandboxPolicy as SandboxExecutionPolicy
+    if (policy.mode === 'danger-full-access') return { mode: policy.mode, enforcement: 'none' }
+    const confined = await this.confine(spec.command, { ...policy, mode: policy.mode }, spec.signal)
+    spec.signal?.throwIfAborted()
+    return { mode: policy.mode, enforcement: confined.enforcement }
+  }
+
   override async run(spec: ShellExecSpec): Promise<ShellRunResult> {
     const policy = spec.sandboxPolicy as SandboxExecutionPolicy
     const { mode } = policy

@@ -12,6 +12,7 @@ import {
 } from './paths.js'
 import { inspectStructuredPath } from './file-boundary.js'
 import { inspectDirectory } from './managed-list.js'
+import { searchIdentity } from './search.js'
 import { assessShell, hardDenyShellReason } from './shell.js'
 import type { Assessment } from './types.js'
 
@@ -43,7 +44,7 @@ export function structuredFilePath(exec: Readonly<ToolExecution>, roots: PolicyR
   if (typeof path !== 'string') throw Error(`missing exact ${key}`)
   const inspected = inspectStructuredPath(path, roots, ['write', 'edit'].includes(exec.name) ||
     (exec.name === 'str_replace_editor' && args?.command !== 'view') ||
-    (exec.name === 'managed_file' && ['write', 'edit', 'trash'].includes(String(args?.operation))), exec.name === 'managed_file',
+    (exec.name === 'managed_file' && ['write', 'edit', 'trash'].includes(String(args?.operation))), true,
     exec.name === 'managed_file' && ['stat', 'verify_recovery'].includes(String(args?.operation)))
   return inspected.nativePath
 }
@@ -148,7 +149,7 @@ const OWNER_CONTROL_TOOLS = new Set([
 
 /** Tools with an implemented Auto execution path; presentation never grants authority. */
 export function supportsAutoTool(name: string): boolean {
-  return ['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'managed_file', 'managed_list',
+  return ['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'managed_file', 'managed_list', 'pwsh', 'bash', 'glob', 'grep',
     'ask_user_question', 'todo_write', 'get_goal', 'create_goal', 'update_goal', 'report'].includes(name)
     || HARNESS_READ_TOOLS.has(name) || OWNER_CONTROL_TOOLS.has(name)
 }
@@ -195,8 +196,8 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
   const hard = hardDenyReason(exec, roots)
   if (hard !== undefined) return { decision: 'deny', reason: hard, classifierEligible: false }
   const sandbox = sandboxRequestState(exec.arguments)
-  if (sandbox.kind !== 'absent') {
-    return { decision: 'deny', reason: 'Auto does not grant sandbox escalation; remove redundant sandbox fields for ordinary structured tools', classifierEligible: false }
+  if (sandbox.kind === 'invalid') {
+    return { decision: 'deny', reason: 'Invalid sandbox permission request', classifierEligible: false }
   }
   const args = record(exec.arguments)
   if (exec.name === 'bash' || exec.name === 'pwsh') {
@@ -237,13 +238,13 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
     let normalized: string
     try { normalized = structuredFilePath(exec, roots) }
     catch (error) { return { decision: 'deny', reason: `unverifiable file boundary: ${String(error)}`, classifierEligible: false } }
-    if (!isWithin(roots.workspace, normalized) || sensitiveReadPath(normalized)) {
-      return { decision: 'ask', reason: 'reading outside the workspace or reading credentials requires exact manual approval', classifierEligible: false }
-    }
+    if (isProtectedProjectPath(normalized, roots) || sensitiveReadPath(normalized)) return { decision: 'deny', reason: 'protected or credential file cannot be read in Auto', classifierEligible: false }
     return { decision: 'allow', reason: 'structured workspace file read', classifierEligible: false }
   }
   if (['grep', 'glob'].includes(exec.name)) {
-    return { decision: 'deny', reason: 'recursive search cannot verify every link and credential boundary; use exact structured file reads', classifierEligible: false }
+    try { searchIdentity(typeof args?.path === 'string' ? args.path : roots.workspace, roots) }
+    catch { return { decision: 'deny', reason: 'search requires an accessible ordinary directory without links', classifierEligible: false } }
+    return { decision: 'allow', reason: 'bounded native search with protected file filtering', classifierEligible: false }
   }
   if (['write', 'edit', 'str_replace_editor'].includes(exec.name)) {
     if (path === undefined || path.trim() === '') return { decision: 'deny', reason: 'mutation target is missing', classifierEligible: false }
@@ -253,7 +254,7 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
     let normalized: string
     try { normalized = structuredFilePath(exec, roots) }
     catch (error) { return { decision: 'deny', reason: `unverifiable file boundary: ${String(error)}`, classifierEligible: false } }
-    if (!isWithin(roots.workspace, normalized) || isProtectedProjectPath(normalized, roots) || sensitiveReadPath(normalized)) {
+    if (isProtectedProjectPath(normalized, roots) || sensitiveReadPath(normalized)) {
       return { decision: 'deny', reason: 'Auto cannot mutate outside-workspace files, credentials or executable security metadata', classifierEligible: false }
     }
     return {
@@ -270,10 +271,11 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
 
 /** Full file identity bound to each exact authorization, never sent as model input. */
 export function fileApprovalIdentity(exec: Readonly<ToolExecution>, roots: PolicyRoots): string | undefined {
+  if (['glob', 'grep'].includes(exec.name)) return searchIdentity(String(record(exec.arguments)?.path ?? roots.workspace), roots)
   if (exec.name === 'managed_list') return inspectDirectory(String(record(exec.arguments)?.directory), roots).identity
   if (!['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'managed_file'].includes(exec.name)) return undefined
   const args = record(exec.arguments)
   const path = structuredFilePath(exec, roots)
   const mutation = ['write', 'edit'].includes(exec.name) || (exec.name === 'str_replace_editor' && args?.command !== 'view') || (exec.name === 'managed_file' && ['write', 'edit', 'trash'].includes(String(args?.operation)))
-  return inspectStructuredPath(path, roots, mutation, exec.name === 'managed_file', exec.name === 'managed_file' && ['stat', 'verify_recovery'].includes(String(args?.operation))).identity
+  return inspectStructuredPath(path, roots, mutation, true, exec.name === 'managed_file' && ['stat', 'verify_recovery'].includes(String(args?.operation))).identity
 }

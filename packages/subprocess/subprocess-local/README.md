@@ -72,6 +72,8 @@ An executable that cannot be resolved fails loud with a stable error. `done` rej
 <details>
 <summary>Implementation internals — click to expand</summary>
 
+The local provider explicitly advertises host filesystem access. This identifies its execution world; it does not assert that spawned programs are isolated or that every host path is writable.
+
 This section explains the design decisions behind the provider and points at the code that realizes them; the observable behavior is covered in [Use this package](#use-this-package).
 
 ### Design concept

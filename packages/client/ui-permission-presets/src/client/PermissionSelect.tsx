@@ -74,7 +74,7 @@ function optionDescription(
   option: PresetOption,
   t: PermissionSelectProps['t'],
 ): string | undefined {
-  return option.value === AUTO_REVIEW ? t('auto.description') : option.description
+  return option.value === 'preservation' ? t('preservation.description') : option.value === AUTO_REVIEW ? t('auto.description') : option.description
 }
 
 /** Business face injected by the permission package's slot registration. */
@@ -184,6 +184,7 @@ export function PermissionSelect({
 
   return (
     <>
+      {selection.currentValue === 'custom' && <span role="status">{t('migration.required')}</span>}
       <Menu
         open={open}
         items={items}

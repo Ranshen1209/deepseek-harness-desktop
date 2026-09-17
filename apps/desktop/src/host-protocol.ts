@@ -1,7 +1,7 @@
 /** Versioned control messages and framed byte transport for the Desktop Host child. */
 
 /** Protocol version implemented by the Electron shell and installed dsh Host. */
-export const DESKTOP_HOST_PROTOCOL_VERSION = 3 as const
+export const DESKTOP_HOST_PROTOCOL_VERSION = 4 as const
 
 /** Child descriptor Electron writes request frames to. */
 export const DESKTOP_REQUEST_PIPE_FD = 3
@@ -30,6 +30,7 @@ const RESPONSE_FRAME_START = 1
 const RESPONSE_FRAME_DATA = 2
 const RESPONSE_FRAME_END = 3
 const RESPONSE_FRAME_ERROR = 4
+const RESPONSE_FRAME_APPROVAL = 5
 
 /** Metadata that precedes one optional request body on the request pipe. */
 export interface DesktopHostRequestStart {
@@ -54,8 +55,16 @@ export type DesktopHostEvent = {
   readonly message: string
 }
 
+/** Minimal Host-authored notification data; commands, content and credentials never cross this channel. */
+export type DesktopApprovalNotice = {
+  readonly state: 'waiting' | 'ended'
+  readonly requestId: string
+  readonly sessionId: string
+  readonly category: 'command' | 'file' | 'tool'
+}
+
 /** One decoded response-pipe frame. */
-export type DesktopHostResponseFrame = {
+export type DesktopHostResponseFrame = { readonly type: 'approval'; readonly streamId: 0; readonly notice: DesktopApprovalNotice } | {
   readonly type: 'start'
   readonly streamId: number
   readonly status: number
@@ -158,7 +167,7 @@ export class DesktopHostResponseDecoder {
     const rawType = this.buffer.readUInt8(4)
     const streamId = this.buffer.readUInt32BE(5)
     const payloadLength = this.buffer.readUInt32BE(9)
-    assertStreamId(streamId)
+    if (rawType !== RESPONSE_FRAME_APPROVAL || streamId !== 0) assertStreamId(streamId)
     const limit = rawType === RESPONSE_FRAME_DATA ? DESKTOP_PIPE_CHUNK_BYTES : MAX_CONTROL_PAYLOAD_BYTES
     if (payloadLength > limit) {
       throw new Error(`dsh desktop: Host response frame exceeds the ${String(limit)}-byte limit`)
@@ -168,6 +177,14 @@ export class DesktopHostResponseDecoder {
     const payload = this.buffer.subarray(FRAME_HEADER_BYTES, frameLength)
     this.buffer = this.buffer.subarray(frameLength)
     switch (rawType) {
+      case RESPONSE_FRAME_APPROVAL: {
+        const value = this.parseJson(payload, 'approval')
+        const id = (input: unknown): input is string => typeof input === 'string' && /^[a-zA-Z0-9:_-]{1,160}$/.test(input)
+        if (streamId !== 0 || !isRecord(value) || Object.keys(value).length !== 4 || !id(value.requestId) || !id(value.sessionId)
+          || typeof value.state !== 'string' || !['waiting', 'ended'].includes(value.state)
+          || typeof value.category !== 'string' || !['command', 'file', 'tool'].includes(value.category)) throw Error('dsh desktop: invalid approval notice')
+        return { type: 'approval', streamId: 0, notice: value as unknown as DesktopApprovalNotice }
+      }
       case RESPONSE_FRAME_START:
         return this.parseStart(streamId, payload)
       case RESPONSE_FRAME_DATA:

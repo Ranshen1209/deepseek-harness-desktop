@@ -9,6 +9,11 @@ import { installProtectionGate } from '../../desktop-host/src/protection.ts'
 let ctx: Context | undefined
 async function fixture() {
   ctx = new Context()
+  const events: Array<{ type: string; data: unknown }> = []
+  let mode = 'preservation'
+  const session = { header: { id: 'gate-session' }, get seq() { return events.length }, eventAt: (seq: number) => events[seq] }
+  const agent = { session }
+  ctx.provide('permissionPresets', { current: () => mode } as never)
   installProtectionGate(ctx)
   await ctx.plugin(SystemPrompt).await()
   await ctx.plugin(ToolRuntime).await()
@@ -28,8 +33,8 @@ async function fixture() {
     await fork.await()
     return fork
   }
-  const input = { name: 'sentinel', arguments: {}, callId: ToolCallId('sentinel-call'), signal: new AbortController().signal }
-  return { ctx, policy, input, calls: () => calls, scheduler: ctx.tools[TOOL_RUNTIME_SCHEDULER] }
+  const input = { agent: agent as never, name: 'sentinel', arguments: {}, callId: ToolCallId('sentinel-call'), signal: new AbortController().signal }
+  return { ctx, policy, input, setMode(value: string) { mode = value; events.push({ type: 'permission/preset', data: { preset: value } }) }, calls: () => calls, scheduler: ctx.tools[TOOL_RUNTIME_SCHEDULER] }
 }
 afterEach(async () => { await ctx?.fiber.dispose() })
 it('blocks dispatch when the bundled policy is missing', async () => {
@@ -69,5 +74,25 @@ it.each([false, true])('cancels calls held by a downstream wrapper, replaced sig
     await policy.dispose()
   } finally { release() }
   expect((await run).isError).toBe(true)
+  expect(f.calls()).toBe(0)
+})
+
+it.each(['read-only', 'workspace-write', 'danger-full-access'])('leaves %s usable with no Auto plugin', async (mode) => {
+  const f = await fixture(); f.setMode(mode)
+  expect((await f.ctx.tools.execute(f.input)).isError).toBe(false)
+  expect(f.calls()).toBe(1)
+})
+it.each([false, true])('revokes a prepared Auto call after a mode switch, switchBack=%s', async (back) => {
+  const f = await fixture(); await f.policy()
+  const prepared = await f.scheduler.prepare(f.input)
+  expect(prepared.kind).toBe('dispatch')
+  f.setMode('danger-full-access'); if (back) f.setMode('preservation')
+  if (prepared.kind !== 'dispatch') throw Error('missing prepared execution')
+  expect((await f.scheduler.dispatch(prepared.exec)).result.isError).toBe(true)
+  expect(f.calls()).toBe(0)
+})
+it('does not execute an inconsistent legacy permission selection', async () => {
+  const f = await fixture(); f.setMode('custom')
+  expect((await f.ctx.tools.execute(f.input)).isError).toBe(true)
   expect(f.calls()).toBe(0)
 })

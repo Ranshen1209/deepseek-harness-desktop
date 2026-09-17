@@ -27,6 +27,8 @@ interface PresetSpec {
 ```ts type-equiv
 /** The {@link PermissionPresetService} config: preset table and composition default. */
 interface Config {
+  /** Require confirmation for legacy full/workspace defaults; omitted preserves upstream behavior. */
+  defaultSemanticsVersion?: string
   /**
    * The preset table: name → knob bundle. Defaults to `workspace-write`
    * (workspace-write + ask) and `danger-full-access` (danger-full-access +
@@ -74,6 +76,8 @@ interface PresetOption {
 
 `permission/preset` 是持久、仅记日志的用户意图：它不进入模型 transcript（文本记录），模型可见的后果由 knob 事件经各自消费方承担；它存在是为了在两个预设共享同一个旋钮组合时，让 `current()` 仍能保住用户选择的究竟是哪一个预设。`permissions` 投影把该选择与两个 knob 事件一同折叠，并保留用于区分空恢复 seed 与新会话的 `session/end-seed` 边界；回放不需要任何追赶状态或原始日志重扫。恢复的 `auto` 选择在 agent 发布前必须存在 live Auto 注册。完整事件声明见[持久化日志事件目录](../persistence-catalog.zh.md)；方法签名见生成的[服务目录](#ctxpermissionpresets--permissionpresetservice)。
 
+桌面配置原生三档权限和 preservation Auto。可选 defaultSemanticsVersion 要求对不一致的旧默认值及预设与参数组合明确重选。custom 标记是不可执行的迁移状态，不改写已有历史来扩大权限。未配置此标记的组合保留原生默认值。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -105,9 +109,9 @@ registerAuto(admit: () => void): () => Promise<void>
 
 /**
  * Resolve the preset matching the effective knob values. A still-matching
- * last selection wins shared-bundle ties; otherwise the first configured
- * match wins. Returns
- * {@link CUSTOM_PRESET} when no available preset matches.
+ * last selection wins shared-bundle ties. A mismatching explicit selection
+ * requires reselection; only sessions without one use the first matching
+ * configured bundle. Unmatched settings return {@link CUSTOM_PRESET}.
  * @param session - the session whose knob state is read.
  * @returns the effective preset name, or `custom` when nothing matches.
  */

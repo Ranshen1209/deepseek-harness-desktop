@@ -1,3 +1,4 @@
+import type { ApprovalReview, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval/types'
 /** Approval composer and optional correlated-detail contracts. */
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -50,6 +51,8 @@ export interface ApprovalDetailOwnerProps {
 
 /** Client-visible fields of an approval request projected through Remote Events. */
 export interface ApprovalPresentationRequest {
+  readonly id?: ApprovalRequestId
+  readonly review?: ApprovalReview
   /** Tool requesting the decision. */
   readonly toolName: string
   /** Tool call correlated with the request. */
@@ -67,6 +70,10 @@ let nextApprovalKey = 0
 
 /** One answerable Client presentation of a pending Host waterfall. */
 export class PendingApproval {
+  /** Host-issued approval identity used for navigation and deduplication. */
+  readonly id: ApprovalRequestId | undefined
+  /** Auto's execution recommendation; absent for native permission requests. */
+  readonly review: ApprovalReview | undefined
   /** Domain discriminator used by Session pending-interaction consumers. */
   readonly kind: 'approval'
   /** Opaque render identity and one-shot remount axis. */
@@ -92,6 +99,8 @@ export class PendingApproval {
    * @param request - Host approval request projected through the Remote Event.
    */
   constructor(readonly sessionId: SessionId, request: ApprovalPresentationRequest) {
+    this.id = request.id
+    this.review = request.review
     this.kind = 'approval'
     nextApprovalKey += 1
     this.key = `approval:${String(nextApprovalKey)}`

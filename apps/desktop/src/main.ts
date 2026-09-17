@@ -9,11 +9,13 @@ import {
   dialog,
   ipcMain,
   Menu,
+  Notification,
   protocol,
   type IpcMainInvokeEvent,
 } from 'electron'
 import { resolveDesktopPaths } from './paths.ts'
 import { DesktopProjectManager, type DesktopProjectHooks } from './project-manager.ts'
+import { ApprovalNotifications } from './approval-notifications.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { DesktopBackendController, type DesktopBackendState } from './backend-controller.ts'
 import { DESKTOP_IPC, type DesktopUpdateState } from './ipc.ts'
@@ -153,6 +155,12 @@ async function serveShellAsset(request: Request): Promise<Response> {
 }
 
 async function main(): Promise<void> {
+  if (process.platform === 'win32') {
+    const metadata = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8')) as { desktopAppId?: string }
+    const appId = metadata.desktopAppId ?? (app.isPackaged ? undefined : 'com.deepseek.harness.desktop')
+    if (appId === undefined || !/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(appId)) throw Error('Desktop notification application identity is missing')
+    app.setAppUserModelId(appId)
+  }
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   const development = app.isPackaged ? undefined : join(app.getAppPath(), '.desktop-build', 'development', 'project')
@@ -205,17 +213,37 @@ async function main(): Promise<void> {
       window.webContents.send(DESKTOP_IPC.backendState, state)
     }
   }
+  const approvalNotifications = new ApprovalNotifications((category) => {
+    if (!Notification.isSupported()) return undefined
+    return new Notification({ title: messages.approvalWaiting, body: category === 'command' ? messages.approvalCommand
+      : category === 'file' ? messages.approvalFile : messages.approvalTool })
+  }, (notice) => {
+    focusPrimaryWindow()
+    const window = mainWindow
+    if (window === undefined || window.isDestroyed()) return
+    const navigate = (): void => {
+      if (!window.isDestroyed() && approvalNotifications.isPending(notice) && window.webContents.getURL().startsWith(applicationUrl)) {
+        window.webContents.send(DESKTOP_IPC.approvalNavigate, { requestId: notice.requestId, sessionId: notice.sessionId })
+      }
+    }
+    if (window.webContents.isLoadingMainFrame()) window.webContents.once('did-finish-load', navigate)
+    else navigate()
+  }, () => { console.warn('desktop: native approval notification unavailable; the in-app request remains pending') })
+  let noticeGeneration = 0
   const backend = new DesktopBackendController((onFailure) => {
     if (development === undefined) manager.assertProfileRuntime(activeProject)
     const hostInspectPort = developmentHostInspectPort(development !== undefined)
+    const generation = ++noticeGeneration
+    approvalNotifications.clear()
     const host = new DesktopHostProcess(resources.node, development ?? resources.dsh, activeProject,
-      hostInspectPort, process.env, onFailure)
+      hostInspectPort, process.env, onFailure, (notice) => { if (generation === noticeGeneration) approvalNotifications.accept(notice) })
     return {
       start: () => host.start(),
-      stop: () => host.stop(),
+      stop: () => { if (generation === noticeGeneration) { noticeGeneration++; approvalNotifications.clear() }; return host.stop() },
       fetch: (request: Request) => host.fetch(request),
     }
   }, (state) => {
+    if (state.phase === 'error') { noticeGeneration++; approvalNotifications.clear() }
     if (state.phase === 'starting' && !emergencyDocument) pageError = undefined
     publishBackend(backendState())
     if (state.phase === 'error') void navigateMain(startupUrl).catch((error: unknown) => { console.error(error) })
@@ -486,6 +514,7 @@ async function main(): Promise<void> {
     if (shellInstallerOwnsQuit || quitting) return
     event.preventDefault()
     quitting = true
+    approvalNotifications.clear()
     void backend.close().catch((error: unknown) => { console.error(error) }).finally(() => { app.quit() })
   })
 

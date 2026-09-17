@@ -84,6 +84,8 @@ export interface ShellExecRequest {
  * background processes have no executor timeout.
  */
 export interface ShellExecSpec {
+  /** Same-process one-shot authorization, checked synchronously after preparation and immediately before spawn. */
+  beforeSpawn?: (spec: ShellExecSpec, provider: object) => void
   command: string
   workdir: string
   timeoutMs: number

@@ -295,6 +295,21 @@ export class UiSession extends Service {
   }
 
   /**
+   * Prefer an existing pending interaction without creating or approving it.
+   * @param sessionId - the session owning the pending interaction.
+   * @param key - the registered interaction key.
+   * @returns whether the interaction is still pending.
+   */
+  focusPendingInteraction(sessionId: SessionId, key: string): boolean {
+    const registered = this.pendingDomains.some(domain => domain.valuesSnapshot()
+      .some(value => value.sessionId === sessionId && value.key === key))
+    if (!registered) return false
+    this.preferredPending.set(sessionId, key)
+    this.publishPendingInteractions()
+    return true
+  }
+
+  /**
    * Register one pending-interaction domain and return its publication function.
    * Domain teardown first removes its visible values, then delegates and awaits
    * every still-active owner request.
@@ -363,6 +378,8 @@ export class UiSession extends Service {
     notifySubscribers(this.currentListeners, '[ui-session] current binding')
   }
 
+  private readonly preferredPending = new Map<SessionId, string>()
+
   private publishPendingInteractions(): void {
     const next = new Map<SessionId, {
       interaction: SessionPendingInteractionBase
@@ -370,12 +387,16 @@ export class UiSession extends Service {
     }>()
     for (const domain of this.pendingDomains) {
       for (const interaction of domain.valuesSnapshot()) {
-        const precedence = domain.precedence(interaction)
+        const precedence = this.preferredPending.get(interaction.sessionId) === interaction.key
+          ? Number.POSITIVE_INFINITY : domain.precedence(interaction)
         const previous = next.get(interaction.sessionId)
         if (previous === undefined || precedence >= previous.precedence) {
           next.set(interaction.sessionId, { interaction, precedence })
         }
       }
+    }
+    for (const [sessionId, key] of this.preferredPending) {
+      if (next.get(sessionId)?.interaction.key !== key) this.preferredPending.delete(sessionId)
     }
     const projected = new Map(
       [...next].map(([sessionId, value]) => [sessionId, value.interaction] as const),

@@ -1701,6 +1701,8 @@ export interface Config {
 ```ts config-catalog
 /** The {@link PermissionPresetService} config: preset table and composition default. */
 export interface Config {
+  /** Require confirmation for legacy full/workspace defaults; omitted preserves upstream behavior. */
+  defaultSemanticsVersion?: string
   /**
    * The preset table: name → knob bundle. Defaults to `workspace-write`
    * (workspace-write + ask) and `danger-full-access` (danger-full-access +
