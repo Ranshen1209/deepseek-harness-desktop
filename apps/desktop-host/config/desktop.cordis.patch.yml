@@ -26,7 +26,34 @@
     - credentials
   config: {}
 
+- id: permission
+  config:
+    defaultPreset: preservation
+    presets:
+      preservation:
+        sandbox: workspace-write
+        approval: ask
+        name: Preservation
+        description: Every admissible call receives model risk and authorization review. Exact file edits still require manual approval. Unisolated execution and deletion are blocked in this desktop release.
+      workspace-write:
+        name: Preservation (legacy workspace mode)
+        description: This saved permission selection remains protected by model review, manual file approval and deletion blocking.
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        name: Preservation (legacy full access)
+        description: Full access is unavailable in this protected desktop. Model review, manual file approval and deletion blocking remain enforced.
+        sandbox: danger-full-access
+        approval: never
+
 - insert:
+    - id: desktop-preservation-policy
+      name: '@nanmicoder/dsh-auto-mode'
+      config:
+        presetName: preservation
+        enforceAllSessions: true
+        modelReview: true
+
     - id: directory-picker-native
       name: '@deepseek-ai/dsh-host-directory-picker-native'
 

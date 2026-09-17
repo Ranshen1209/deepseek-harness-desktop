@@ -3,12 +3,12 @@
     "label": "Application",
     "submenu": [
       {
-        "label": "Manage Desktop Plugins",
+        "label": "Desktop Plugins…",
         "accelerator": "CmdOrCtrl+,",
         "enabled": true
       },
       {
-        "label": "Check for Updates"
+        "label": "Check for Updates…"
       },
       {
         "type": "separator"

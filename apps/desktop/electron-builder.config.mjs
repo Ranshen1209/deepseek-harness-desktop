@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   resolveDesktopAppId,
   resolveMacOSNotarizationEnvironment,
@@ -9,8 +11,8 @@ import {
   createWindowsTokenSigner,
   installWindowsNsisBootstrapSigner,
 } from './scripts/windows-sign.mjs'
-import { resolveDesktopAutoUpdateConfig, resolveDesktopAutoUpdateTarget } from './scripts/desktop-auto-update-environment.mjs'
-import { desktopTargetBuildPaths } from './scripts/desktop-build-paths.mjs'
+import { resolveDesktopAutoUpdateConfig } from './scripts/desktop-auto-update-environment.mjs'
+import { desktopTargetBuildPaths, resolveDesktopBuildTarget } from './scripts/desktop-build-paths.mjs'
 
 /**
  * Create electron-builder configuration from one release environment.
@@ -24,11 +26,14 @@ export function createElectronBuilderConfig(
   hostPlatform = process.platform,
   hostArch = process.arch,
 ) {
-  const unsigned = env.DSH_DESKTOP_UNSIGNED === '1'
   const appId = resolveDesktopAppId(env)
   const targetPlatform = env.DSH_DESKTOP_TARGET_PLATFORM
   const resolvedPlatform = targetPlatform ?? hostPlatform
   const resolvedArch = env.DSH_DESKTOP_TARGET_ARCH ?? hostArch
+  if (env.DSH_DESKTOP_UNSIGNED !== undefined && !['0', '1'].includes(env.DSH_DESKTOP_UNSIGNED)) {
+    throw new Error('desktop package: DSH_DESKTOP_UNSIGNED must be 0 or 1')
+  }
+  const unsigned = env.DSH_DESKTOP_UNSIGNED === '1'
   const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
   const packagesWindows = targetPlatform === 'win32'
   const macOSSigning = packagesMacOS && !unsigned ? resolveMacOSSigningEnvironment(env) : undefined
@@ -45,7 +50,7 @@ export function createElectronBuilderConfig(
     installWindowsNsisBootstrapSigner({ sign: windowsSigner })
   }
   const update = unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
-  const buildPaths = desktopTargetBuildPaths(resolveDesktopAutoUpdateTarget(resolvedPlatform, resolvedArch))
+  const buildPaths = desktopTargetBuildPaths(resolveDesktopBuildTarget(env, hostPlatform, hostArch))
   return {
     appId,
     productName: 'DeepSeek Harness',
@@ -57,10 +62,18 @@ export function createElectronBuilderConfig(
       'lib/*.cjs',
       'renderer/**/*',
       'package.json',
+      { from: buildPaths.dsh, to: 'dsh', filter: ['**/*'] },
+      // electron-builder excludes a source directory's root node_modules.
+      { from: join(buildPaths.dsh, 'node_modules'), to: 'dsh/node_modules', filter: ['**/*'] },
+    ],
+    asarUnpack: [
+      '**/*.{node,dylib,dll,so,exe}',
+      '**/*.so.*',
+      '**/spawn-helper',
+      '**/@vscode/ripgrep/bin/rg',
     ],
     extraResources: [
       { from: buildPaths.runtime, to: 'runtime' },
-      { from: buildPaths.seed, to: 'seed' },
     ],
     mac: {
       category: 'public.app-category.developer-tools',
@@ -68,6 +81,8 @@ export function createElectronBuilderConfig(
       identity: unsigned ? '-' : macOSSigning?.signingIdentity,
       forceCodeSigning: !unsigned,
       hardenedRuntime: !unsigned,
+      // ASAR-unpacked native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
+      signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '\\.pak$'],
       notarize: !unsigned,
       target: ['dmg', 'zip'],
     },
@@ -75,7 +90,7 @@ export function createElectronBuilderConfig(
       sign: !unsigned,
       writeUpdateInfo: false,
     },
-    afterSign: context => {
+    afterSign: async context => {
       if (unsigned || context.electronPlatformName !== 'darwin') return
       verifyMacOSSignatureAfterSign(context, macOSSigning ?? resolveMacOSSigningEnvironment(env))
     },
@@ -90,20 +105,18 @@ export function createElectronBuilderConfig(
     win: {
       icon: 'build/icon.ico',
       forceCodeSigning: !unsigned,
-      ...(unsigned || windowsSigner === undefined ? {} : {
-        signtoolOptions: {
-          sign: windowsSigner,
-          signingHashAlgorithms: ['sha256'],
-        },
-      }),
+      signtoolOptions: {
+        sign: windowsSigner,
+        signingHashAlgorithms: ['sha256'],
+      },
       target: ['nsis'],
     },
     linux: {
       category: 'Development',
-      icon: 'build/icon.png',
       target: ['AppImage'],
     },
     nsis: {
+      include: fileURLToPath(new URL('./scripts/installer.nsh', import.meta.url)),
       oneClick: false,
       allowToChangeInstallationDirectory: true,
       differentialPackage: true,

@@ -1,0 +1,137 @@
+{
+  "name": "@nanmicoder/dsh-auto-mode",
+  "version": "0.3.0-alpha.1",
+  "description": "Preservation-first, fail-closed permission policy for DeepSeek Harness",
+  "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "permission",
+    "security",
+    "plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ranshen1209/dsh-auto-mode.git"
+  },
+  "homepage": "https://github.com/Ranshen1209/dsh-auto-mode#readme",
+  "bugs": {
+    "url": "https://github.com/Ranshen1209/dsh-auto-mode/issues"
+  },
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "compatibility.json",
+    "src/upstream-review/LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.client.json && tsdown"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:*",
+    "@deepseek-ai/dsh-client-locale": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-permission-presets": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-user-approval": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*",
+    "@deepseek-ai/dsh-fs": "workspace:*",
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-agent-instructions": "workspace:*",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
+    "@deepseek-ai/dsh-subagent": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-locale": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-permission-presets": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-user-approval": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-system-prompt": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-fs": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-agent": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-agent-instructions": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-util-values": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-subagent": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^6.0.3",
+    "tsdown": "^0.21.0"
+  },
+  "license": "MIT",
+  "private": true,
+  "sourcePin": {
+    "repository": "https://github.com/Ranshen1209/dsh-auto-mode",
+    "commit": "9cf3d035bd3d8ccf1d09cc48446763ccba4ee8f4",
+    "files": {
+      "src/artifacts.ts": "0c8383de2dc93e6a8672830db9e9715397148f12b9d9466cf37b9630b0d5de22",
+      "src/classifier.ts": "af7306b8943b877763bfcec495daa99d90b1f1934f91b3eead68d2759934964e",
+      "src/client/icon-injection.ts": "8d6f49155eaa847e7fdd3e600e0b2e3860e2d0797feb7123733a2b8b16b5d54a",
+      "src/client/index.ts": "3adef2178c03da2d7acaa938744af05d8d37b6162d5f207718b6ea46be11a356",
+      "src/client/locales.ts": "c0e029ea3de87f84083beb205d0124c3456348afb0fd925ba2b07d9363f29972",
+      "src/dsh-classifier.ts": "7340c14469743fc95e1480c22e7e5fbdd9c05f051c6b25e661325cdf9fc2e5d5",
+      "src/escalation.ts": "58198c44c16750b2a2a87ae1568984da5a19b564055de6c74568b1d6fc7fba56",
+      "src/file-boundary.ts": "ccd4f9055c2f950aefd22f7536ab2f6969d7e55084302c97f89e31bf3c695fa5",
+      "src/harness-compat.ts": "ffe31c701d36362344fdd4787b4bf92db04a3306e253e178886d745de025d1e8",
+      "src/index.ts": "1ad85877c70f319d717d336d197a276a3d28c95eaff7b4f13b022c47630daa42",
+      "src/patch.ts": "2fa9b8d1905ea3ffd2ed52d7420694fd6aea1cb56884ad10e290e5c38133aec1",
+      "src/paths.ts": "803f09b1a9f3b5d0954b5a6586048689dbf63e86cdf5d8a9b0af4665d228305c",
+      "src/policy.ts": "022b726c7bdbbfc6d730f766c0de7c842f45df3fa3c8d43185e5ef17e03cd51e",
+      "src/shell.ts": "7b77cfcfb8d3388db5d9941f4ac08356633448145baa3e6a6941dca051571287",
+      "src/types.ts": "8a6a1252d9ed78be77af8e60c9c9e6ff54662dea5a2329407db7389c80bd9d57",
+      "src/upstream-review/index.ts": "d5d605c35472f484585c74ae8d19baf78872b37d0ffb5c8dc8a627d19119e0ee",
+      "src/upstream-review/LICENSE": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+    },
+    "lineEndings": "LF"
+  }
+}

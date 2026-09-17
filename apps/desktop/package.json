@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
-  "description": "Electron desktop shell for an isolated pnpm-installed dsh runtime",
-  "version": "0.1.5-rc.1.desktop.5",
+  "description": "Electron desktop shell for a bundled dsh runtime and external plugins",
+  "version": "0.1.6-alpha.1.desktop.1",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -12,10 +12,7 @@
     "start": "tsx scripts/dev.ts --skip-build",
     "prepare:runtime": "tsx scripts/prepare-runtime.ts",
     "prepare:packages": "tsx scripts/prepare-package-set.ts",
-    "prepare:seed": "tsx scripts/prepare-seed.ts",
-    "verify:runtime": "tsx scripts/verify-prepared-runtime.ts",
-    "test:ui": "node --experimental-strip-types tests/first-run.e2e.ts",
-    "generate:icons": "node scripts/generate-icons.mjs",
+    "prepare:dsh": "tsx scripts/prepare-dsh.ts",
     "prepare:package": "tsx scripts/package-target.ts --prepare-only",
     "verify:mac-signature": "node scripts/verify-macos-signature.mjs",
     "package": "tsx scripts/package-target.ts",
@@ -25,10 +22,13 @@
     "package:mac:x64": "tsx scripts/package-target.ts mac-x64",
     "package:mac:x64:dir": "tsx scripts/package-target.ts mac-x64 --dir",
     "package:win:x64": "tsx scripts/package-target.ts win-x64",
+    "package:win:x64:unsigned": "tsx scripts/package-target.ts win-x64 --unsigned",
     "package:win:x64:dir": "tsx scripts/package-target.ts win-x64 --dir",
     "upload:mac:arm64": "tsx scripts/upload-target.ts mac-arm64",
     "upload:mac:x64": "tsx scripts/upload-target.ts mac-x64",
-    "upload:win:x64": "tsx scripts/upload-target.ts win-x64"
+    "upload:win:x64": "tsx scripts/upload-target.ts win-x64",
+    "generate:icons": "node scripts/generate-icons.mjs",
+    "test:ui": "node --experimental-strip-types tests/first-run.e2e.ts"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
@@ -46,12 +46,10 @@
     "electron-builder": "^26.15.3",
     "extract-zip": "^2.0.1",
     "js-yaml": "^4.2.0",
-    "msgpackr": "2.0.4",
     "pnpm": "11.7.0",
-    "playwright": "^1.49.0",
-    "png2icons": "^2.0.1",
-    "sharp": "^0.35.3",
     "tar": "^7.5.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "playwright": "^1.49.0",
+    "sharp": "^0.35.3"
   }
 }

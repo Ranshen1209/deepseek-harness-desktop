@@ -7,7 +7,7 @@ import {
 } from '../scripts/desktop-release-environment.mjs'
 import { notarizeMacOSDiskImageArtifact } from '../scripts/notarize-macos-disk-images.mjs'
 import {
-  assertMacOSSeedSignatureDetails,
+  assertMacOSRuntimeSignatureDetails,
   assertMacOSSignatureDetails,
 } from '../scripts/verify-macos-signature.mjs'
 
@@ -40,11 +40,9 @@ describe('desktop macOS release signature', () => {
     const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
     const config = createElectronBuilderConfig(RELEASE_ENVIRONMENT, 'darwin', 'arm64')
     expect(portablePath(config.directories.output)).toContain('/.desktop-build/targets/mac-arm64/artifacts')
-    expect(config.extraResources).toHaveLength(2)
+    expect(config.extraResources).toHaveLength(1)
     expect(config.extraResources[0]?.to).toBe('runtime')
-    expect(config.extraResources[1]?.to).toBe('seed')
     expect(portablePath(config.extraResources[0]?.from ?? '')).toContain('/.desktop-build/targets/mac-arm64/runtime')
-    expect(portablePath(config.extraResources[1]?.from ?? '')).toContain('/.desktop-build/targets/mac-arm64/seed')
     expect(config).toMatchObject({
       appId: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
       mac: {
@@ -105,7 +103,7 @@ describe('desktop macOS release signature', () => {
       DSH_DESKTOP_UNSIGNED: '1',
     }, 'win32', 'x64')
     expect(config.win).toMatchObject({ forceCodeSigning: false })
-    expect(config.win.signtoolOptions).toBeUndefined()
+    expect(config.win.signtoolOptions.sign).toBeUndefined()
     expect(config.publish).toBeNull()
   })
 
@@ -119,7 +117,7 @@ describe('desktop macOS release signature', () => {
     }).not.toThrow()
   })
 
-  it('requires a secure timestamp and hardened runtime for seed code', () => {
+  it('requires a secure timestamp and hardened runtime for runtime code', () => {
     const expected = resolveMacOSSigningEnvironment(RELEASE_ENVIRONMENT)
     const details = [
       `Authority=Developer ID Application: ${expected.signingIdentity}`,
@@ -127,12 +125,12 @@ describe('desktop macOS release signature', () => {
       'Timestamp=31 Aug 2026 at 20:00:00',
       'CodeDirectory v=20500 size=773 flags=0x10000(runtime) hashes=13+7 location=embedded',
     ].join('\n')
-    expect(() => { assertMacOSSeedSignatureDetails(details, expected) }).not.toThrow()
+    expect(() => { assertMacOSRuntimeSignatureDetails(details, expected) }).not.toThrow()
     expect(() => {
-      assertMacOSSeedSignatureDetails(details.replace(/^Timestamp=.*\n/um, ''), expected)
+      assertMacOSRuntimeSignatureDetails(details.replace(/^Timestamp=.*\n/um, ''), expected)
     }).toThrow(/secure timestamp/u)
     expect(() => {
-      assertMacOSSeedSignatureDetails(details.replace('flags=0x10000(runtime)', 'flags=0x0(none)'), expected)
+      assertMacOSRuntimeSignatureDetails(details.replace('flags=0x10000(runtime)', 'flags=0x0(none)'), expected)
     }).toThrow(/hardened runtime/u)
   })
 

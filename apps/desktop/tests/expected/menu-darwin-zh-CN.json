@@ -3,12 +3,12 @@
     "label": "DeepSeek Harness",
     "submenu": [
       {
-        "label": "桌面插件管理",
+        "label": "桌面插件…",
         "accelerator": "CmdOrCtrl+,",
         "enabled": true
       },
       {
-        "label": "检查更新"
+        "label": "检查更新…"
       },
       {
         "type": "separator"
