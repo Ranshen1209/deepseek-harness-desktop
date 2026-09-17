@@ -109,7 +109,9 @@ export function resolveRoots(activeWorkspace: string | undefined, options: RootO
   const environmentDshHome = process.env.DSH_HOME?.trim()
   const configuredDshHome = options.dshHome ?? (environmentDshHome === '' ? undefined : environmentDshHome)
   const dshHome = resolveNativePath(configuredDshHome ?? posix.join(home, '.dsh'), workspace, home)
-  const tempRoots = (options.tempRoots ?? [tmpdir()]).map(root => resolveNativePath(root, workspace, home))
+  // Schemastery materializes an omitted optional array as []; use the OS temp
+  // directory in both forms so the advertised probe location exists.
+  const tempRoots = (options.tempRoots?.length ? options.tempRoots : [tmpdir()]).map(root => resolveNativePath(root, workspace, home))
   return { workspace, home, dshHome, tempRoots }
 }
 
@@ -174,6 +176,11 @@ export function workspaceRootReason(target: string, roots: PolicyRoots): string 
   if (isWithin(roots.dshHome, normalized)) return `DSH_HOME path ${normalized}`
   if (isCriticalPath(normalized, roots)) return `system or credential-critical path ${normalized}`
   return undefined
+}
+
+/** Credential and local authentication paths require separate read authority. */
+export function sensitiveReadPath(path: string): boolean {
+  return /(?:^|[\\/])(?:\.ssh|\.gnupg|\.aws|\.azure|\.kube|\.config[\\/]gh|\.docker)(?:[\\/]|$)|(?:^|[\\/])(?:id_rsa|id_ed25519|credentials|credentials\.yaml|config\.json|\.env|\.npmrc|\.netrc|\.pypirc|netrc)(?:$|[.\\/])/i.test(path)
 }
 
 /** Protect the home directory itself as well as system and Harness data targets. */

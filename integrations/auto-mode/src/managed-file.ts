@@ -1,18 +1,20 @@
 import { createHash } from 'node:crypto'
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
 import { inspectStructuredPath } from './file-boundary.js'
 import { normalizePath, type PolicyRoots } from './paths.js'
+import { preservedMove } from './preserved-move.js'
 
 interface ManagedFileArgs {
-  operation: 'read' | 'write' | 'edit' | 'trash'
+  operation: 'read' | 'write' | 'edit' | 'trash' | 'stat' | 'verify_recovery'
   file_path: string
   content?: string
   old_string?: string
   new_string?: string
+  create_only?: boolean
 }
 
 /** A file identity captured and checked by the policy for one registered call. */
@@ -30,32 +32,38 @@ export function registerManagedFile(
   rootsFor: (exec: Readonly<ToolExecution>) => PolicyRoots,
   authorize: (exec: ToolExecution) => Promise<ManagedFileAuthorization>,
   policySignal: AbortSignal,
+  recordCreation: (exec: ToolExecution, path: string, identity: string) => void,
 ): void {
+  const recoveries = new WeakMap<object, Map<string, { path: string; identity: string; sha256: string }>>()
   ctx.tools.register(defineTool({
     name: 'managed_file',
-    description: 'Read, create, edit or remove one exact regular file. Use for necessary work outside the workspace or reversible deletion. Trash moves the original into .auto-recovery; no permanent deletion or directory operations. Supply an absolute file_path. Model review is required; outside targets and trash are automatic only when a direct human instruction names the complete path in quotes, backticks or on its own line, otherwise confirmation is requested. Never use this to bypass a denial.',
+    description: 'Read, stat, create, edit or reversibly trash one exact regular file, including outside the workspace. Supply an absolute file_path. stat works for absent files. write with create_only:true refuses existing files. For user-authorized write/delete tests choose a new dsh-probe-<at least 8 random letters or digits>.txt in the advertised probe directory; the user need not choose its filename. After trash, verify_recovery with the ORIGINAL path checks this session\'s preserved bytes without accessing arbitrary recovery data. Each operation needs task/model authorization; ambiguous effects ask once. No directories, permanent deletion or shell execution.',
     parameters: {
-      operation: { type: 'string', enum: ['read', 'write', 'edit', 'trash'], required: true },
+      operation: { type: 'string', enum: ['read', 'write', 'edit', 'trash', 'stat', 'verify_recovery'], required: true },
       file_path: { type: 'string', required: true },
       content: { type: 'string', description: 'Complete new content, required for write.' },
       old_string: { type: 'string', description: 'Nonempty literal text matching exactly once, required for edit.' },
       new_string: { type: 'string', description: 'Literal replacement, required for edit.' },
+      create_only: { type: 'boolean', description: 'write only: exclusively create a new file; an existing target is refused.' },
     },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: {
         path: { type: 'string', required: true }, operation: { type: 'string', required: true },
         content: { type: 'string' }, recovery_path: { type: 'string' },
+        exists: { type: 'boolean' }, bytes: { type: 'number' }, sha256: { type: 'string' }, recovered: { type: 'boolean' },
       } },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
     },
     async execute(args: ManagedFileArgs, exec) {
       const roots = rootsFor(exec)
-      const mutation = args.operation !== 'read'
-      const inspected = inspectStructuredPath(args.file_path, roots, mutation, true)
+      const mutation = ['write', 'edit', 'trash'].includes(args.operation)
+      const allowAbsent = ['stat', 'verify_recovery'].includes(args.operation)
+      const inspected = inspectStructuredPath(args.file_path, roots, mutation, true, allowAbsent)
       const path = inspected.nativePath
       let before: Buffer | undefined
       try { before = readFileSync(path) }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || args.operation !== 'write') throw error }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || (!allowAbsent && args.operation !== 'write')) throw error }
+      if (args.create_only === true && (args.operation !== 'write' || before !== undefined)) throw Error('create_only requires an absent file')
       let content: string | undefined
       if (args.operation === 'write') {
         if (typeof args.content !== 'string') throw Error('write requires complete content')
@@ -73,9 +81,20 @@ export function registerManagedFile(
       const assertCurrent = () => {
         signal.throwIfAborted()
         authorized.revalidate()
-        if (inspectStructuredPath(args.file_path, roots, mutation, true).identity !== inspected.identity) throw Error('file identity changed before the operation')
+        if (inspectStructuredPath(args.file_path, roots, mutation, true, allowAbsent).identity !== inspected.identity) throw Error('file identity changed before the operation')
       }
       assertCurrent()
+      if (args.operation === 'stat') return { path, operation: args.operation, exists: before !== undefined,
+        ...(before === undefined ? {} : { bytes: before.length, sha256: createHash('sha256').update(before).digest('hex') }) }
+      if (args.operation === 'verify_recovery') {
+        const receipt = exec.agent && recoveries.get(exec.agent)?.get(path)
+        if (!receipt) throw Error('No completed trash receipt for this file in this session')
+        if (before !== undefined || inspectStructuredPath(receipt.path, roots, false, true).identity !== receipt.identity) throw Error('Original or recovery file changed since trash')
+        const bytes = readFileSync(receipt.path)
+        assertCurrent()
+        if (createHash('sha256').update(bytes).digest('hex') !== receipt.sha256) throw Error('Recovered content changed')
+        return { path, operation: args.operation, exists: false, recovered: true, bytes: bytes.length, sha256: receipt.sha256 }
+      }
       if (args.operation === 'read') {
         if (authorized.version === undefined) throw Error('read requires the reviewed file version')
         const content = new TextDecoder('utf-8', { fatal: true }).decode(before!)
@@ -85,10 +104,18 @@ export function registerManagedFile(
       if (args.operation !== 'trash') {
         const intent = await ctx.waterfall('fs/write-intent', authorized.target, exec, () => undefined)
         if (intent === undefined) throw Error('exact write intent is missing')
+        if (args.create_only === true && intent.kind !== 'createIfAbsent') throw Error('create_only requires exclusive creation')
         assertCurrent()
         // This call grants the reviewed file leaf; the official provider retains
         // its standard temporary roots. Session workspace and mode are unchanged.
         const outcome = await authorized.fs.writeText(authorized.target, content!, intent, signal, { mode: 'workspace-write', workspaceRoot: path })
+        if (args.create_only === true) {
+          const committed = inspectStructuredPath(path, roots, false, true)
+          const info = await authorized.fs.stat(authorized.target, signal)
+          if (info?.version !== outcome.version || inspectStructuredPath(path, roots, false, true).identity !== committed.identity
+            || !readFileSync(path).equals(Buffer.from(content!))) throw Error('Created file changed before probe recording')
+          recordCreation(exec, path, committed.identity)
+        }
         ctx.emit('fs/observed', authorized.target, { kind: 'present', version: outcome.version }, exec)
         return { path, operation: args.operation }
       }
@@ -113,7 +140,13 @@ export function registerManagedFile(
         checkDirectory(entry)
         authorized.consume()
         assertCurrent()
-        renameSync(path, recovery)
+        preservedMove(path, recovery, () => { assertCurrent(); checkDirectory(area); checkDirectory(entry) }, () => {
+          if (exec.agent) {
+            const receipts = recoveries.get(exec.agent) ?? new Map()
+            receipts.set(path, { path: recovery!, identity: inspectStructuredPath(recovery!, roots, false, true).identity, sha256: createHash('sha256').update(before).digest('hex') })
+            recoveries.set(exec.agent, receipts)
+          }
+        })
         ctx.emit('fs/observed', authorized.target, { kind: 'absent' }, exec)
         return { path, operation: args.operation, recovery_path: recovery }
       }

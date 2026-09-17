@@ -30,7 +30,7 @@ export interface FileBoundary { readonly path: string; readonly nativePath: stri
  * Trusted host/filesystem code must still prevent a concurrent replacement
  * between the tool guard and its own open/write operation.
  */
-export function inspectStructuredPath(input: string, roots: PolicyRoots, mutation: boolean, allowOutside = false): FileBoundary {
+export function inspectStructuredPath(input: string, roots: PolicyRoots, mutation: boolean, allowOutside = false, allowAbsent = false, directory = false): FileBoundary {
   const ambiguous = ambiguousPathReason(input) ?? ambiguousPathReason(roots.workspace)
   if (ambiguous) throw Error(ambiguous)
   const workspace = resolveNativePath(roots.workspace, roots.workspace)
@@ -40,8 +40,8 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
   const workspaceInfo = lstatSync(workspace, { bigint: true })
   if (!workspaceInfo.isDirectory() || workspaceInfo.isSymbolicLink() || workspaceInfo.ino === 0n) throw Error('unverifiable workspace directory')
   const target = resolve(workspace, input)
-  if (normalizePath(target, workspace) === normalizePath(workspace, workspace)) throw Error('target must be an exact file, not the workspace root')
-  if (hardDestructiveTargetReason(target, roots)) throw Error('protected file target')
+  if (!directory && normalizePath(target, workspace) === normalizePath(workspace, workspace)) throw Error('target must be an exact file, not the workspace root')
+  if (hardDestructiveTargetReason(target, roots) && !(directory && !mutation && target === roots.home)) throw Error('protected file target')
   const parts: string[] = []
   let current = target
   while (true) {
@@ -55,7 +55,7 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
   for (const part of parts) {
     let info
     try { info = lstatSync(part, { bigint: true }) } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT' && part === target && mutation) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' && part === target && (mutation || allowAbsent)) {
         identity.push([part, 'absent'])
         continue
       }
@@ -64,7 +64,7 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
     if (info.isSymbolicLink()) throw Error('symbolic links and junctions are not authorized')
     // Detect realpath aliases that lstat alone might not identify.
     if (normalizePath(realpathSync.native(part), workspace) !== normalizePath(part, workspace)) throw Error('filesystem alias is not authorized')
-    if (part !== target) {
+    if (part !== target || directory) {
       if (!info.isDirectory()) throw Error('ancestor is not a directory')
       if (info.dev === workspaceInfo.dev && info.ino === workspaceInfo.ino) withinWorkspace = true
       identity.push([part, String(info.dev), String(info.ino), String(info.mode)])

@@ -15,6 +15,7 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 ## Table of Contents
 
 - [Reference previews](#reference-previews)
+- [Approval details](#approval-details)
 - [System prompt row](#system-prompt-row)
 - [Turn token usage](#turn-token-usage)
 - [Completed-turn footer](#completed-turn-footer)
@@ -30,6 +31,11 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 ## Reference previews
 
 Sent file references and skills confirmed by the message’s logged invocation open in the right Sidebar. File paths use the viewed Session; skill names resolve through its current input-trigger source. Both use the prose file-link dotted underline on hover or focus. Sessions, directories, and command labels remain non-navigating references.
+
+<a id="approval-details"></a>
+## Approval details
+
+Approval details display the complete arguments of the pending Tool call matched by `callId` in the viewed Session. Values remain expanded and render as plain text without truncation. Displaying these arguments grants no authority.
 
 <a id="system-prompt-row"></a>
 ## System prompt row

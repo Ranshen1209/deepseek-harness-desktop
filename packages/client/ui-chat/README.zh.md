@@ -15,6 +15,7 @@ kind: "package-reference"
 ## 目录
 
 - [引用预览](#reference-previews)
+- [审批详情](#approval-details)
 - [系统提示词行](#system-prompt-row)
 - [轮次 token 用量](#turn-token-usage)
 - [已完成轮次的页脚](#completed-turn-footer)
@@ -30,6 +31,11 @@ kind: "package-reference"
 ## 引用预览
 
 已发送的文件引用及消息日志确认调用的 skill 可在右侧栏打开预览。文件路径使用当前查看的 Session；skill 名称由该 Session 当前的输入触发源解析。两者悬停或聚焦时均使用正文文件链接的虚线下划线。会话、目录和命令标签仍只作为引用展示。
+
+<a id="approval-details"></a>
+## 审批详情
+
+审批详情按 `callId` 匹配当前查看的 Session 中等待审批的工具调用，展示其完整参数。参数保持展开，以纯文本呈现且不截断。展示这些参数不会增加任何授权。
 
 <a id="system-prompt-row"></a>
 ## 系统提示词行

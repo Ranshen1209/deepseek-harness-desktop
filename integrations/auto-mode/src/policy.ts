@@ -7,9 +7,11 @@ import {
   hardDestructiveTargetReason,
   isProtectedProjectPath,
   isWithin,
+  sensitiveReadPath,
   type PolicyRoots,
 } from './paths.js'
 import { inspectStructuredPath } from './file-boundary.js'
+import { inspectDirectory } from './managed-list.js'
 import { assessShell, hardDenyShellReason } from './shell.js'
 import type { Assessment } from './types.js'
 
@@ -41,7 +43,8 @@ export function structuredFilePath(exec: Readonly<ToolExecution>, roots: PolicyR
   if (typeof path !== 'string') throw Error(`missing exact ${key}`)
   const inspected = inspectStructuredPath(path, roots, ['write', 'edit'].includes(exec.name) ||
     (exec.name === 'str_replace_editor' && args?.command !== 'view') ||
-    (exec.name === 'managed_file' && args?.operation !== 'read'), exec.name === 'managed_file')
+    (exec.name === 'managed_file' && ['write', 'edit', 'trash'].includes(String(args?.operation))), exec.name === 'managed_file',
+    exec.name === 'managed_file' && ['stat', 'verify_recovery'].includes(String(args?.operation)))
   return inspected.nativePath
 }
 
@@ -120,10 +123,6 @@ export function sandboxEscalationRequest(argumentsValue: unknown): SandboxEscala
   }
 }
 
-function sensitiveReadPath(path: string): boolean {
-  return /(?:^|[\\/])(?:\.ssh|\.gnupg|\.aws|\.azure|\.kube|\.config[\\/]gh|\.docker)(?:[\\/]|$)|(?:^|[\\/])(?:id_rsa|id_ed25519|credentials|credentials\.yaml|config\.json|\.env|\.npmrc|\.netrc|\.pypirc|netrc)(?:$|[.\\/])/i.test(path)
-}
-
 const DESTRUCTIVE_TOOL = /(?:^|[_-])(?:delete|destroy|remove|erase|purge|drop|truncate|wipe|unlink|rmdir|reset|revoke)(?:$|[_-])/i
 const EXTERNAL_WRITE_TOOL = /(?:^|[_-])(?:deploy|publish|push|upload|send|post|release|merge|submit|create[-_]?(?:issue|pull[-_]?request))(?:$|[_-])/i
 
@@ -146,6 +145,13 @@ const OWNER_CONTROL_TOOLS = new Set([
   'job_kill',
   'terminal_close',
 ])
+
+/** Tools with an implemented Auto execution path; presentation never grants authority. */
+export function supportsAutoTool(name: string): boolean {
+  return ['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'managed_file', 'managed_list',
+    'ask_user_question', 'todo_write', 'get_goal', 'create_goal', 'update_goal', 'report'].includes(name)
+    || HARNESS_READ_TOOLS.has(name) || OWNER_CONTROL_TOOLS.has(name)
+}
 
 /** Synchronous hard-deny reason suitable for the monotonic tool guard. */
 export function hardDenyReason(exec: Readonly<ToolExecution>, roots: PolicyRoots): string | undefined {
@@ -199,9 +205,16 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
       : { decision: 'deny', reason: 'shell command is missing or invalid', classifierEligible: false }
   }
   const path = pathArgument(args)
+  if (exec.name === 'managed_list') {
+    if (typeof args?.directory !== 'string') return { decision: 'deny', reason: 'directory is required', classifierEligible: false }
+    try { inspectDirectory(args.directory, roots) }
+    catch { return { decision: 'deny', reason: 'directory is outside the workspace, unavailable, protected or linked', classifierEligible: false } }
+    return { decision: 'allow', reason: 'bounded structured workspace directory listing', classifierEligible: false }
+  }
   if (typeof args?.path === 'string' && typeof args?.file_path === 'string' && args.path !== args.file_path) return { decision: 'deny', reason: 'ambiguous target fields', classifierEligible: false }
   if (exec.name === 'managed_file') {
-    if (path === undefined || !isAbsolute(path) || !['read', 'write', 'edit', 'trash'].includes(String(args?.operation))) {
+    if (args?.operation === 'trash' && (process.platform !== 'win32' || !['x64', 'arm64'].includes(process.arch))) return { decision: 'deny', reason: 'protected trash is unavailable on this platform; no unsafe fallback is provided', classifierEligible: false }
+    if (path === undefined || !isAbsolute(path) || !['read', 'write', 'edit', 'trash', 'stat', 'verify_recovery'].includes(String(args?.operation))) {
       return { decision: 'deny', reason: 'managed_file requires one absolute file path and a supported operation', classifierEligible: false }
     }
     let normalized: string
@@ -210,11 +223,12 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
     if (isProtectedProjectPath(normalized, roots) || sensitiveReadPath(normalized)) {
       return { decision: 'deny', reason: 'managed_file cannot access credentials, security metadata or recovery records', classifierEligible: false }
     }
-    if (args?.operation !== 'write' && !existedBefore(normalized)) {
+    if (!['write', 'stat', 'verify_recovery'].includes(String(args?.operation)) && !existedBefore(normalized)) {
       return { decision: 'deny', reason: 'this operation requires an existing regular file', classifierEligible: false }
     }
-    return { decision: 'ask', reason: 'this exact file operation requires task authorization; outside-workspace targets and recycling require an explicit user target or one-time confirmation', classifierEligible: false,
-      ...(args?.operation === 'read' ? {} : { filesystemEffects: [{ kind: args?.operation === 'trash' ? 'recycle' as const : 'create-or-overwrite' as const, path: normalized, existedBefore: existedBefore(normalized) }] }),
+    if (args?.create_only === true && (args.operation !== 'write' || existedBefore(normalized))) return { decision: 'deny', reason: 'create_only requires a new absent file', classifierEligible: false }
+    return { decision: 'ask', reason: 'this exact file operation requires task authorization; confirmation is needed when the task does not authorize its effects', classifierEligible: false,
+      ...(['read', 'stat', 'verify_recovery'].includes(String(args?.operation)) ? {} : { filesystemEffects: [{ kind: args?.operation === 'trash' ? 'recycle' as const : 'create-or-overwrite' as const, path: normalized, existedBefore: existedBefore(normalized) }] }),
     }
   }
   const view = exec.name === 'str_replace_editor' && args?.command === 'view'
@@ -256,9 +270,10 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
 
 /** Full file identity bound to each exact authorization, never sent as model input. */
 export function fileApprovalIdentity(exec: Readonly<ToolExecution>, roots: PolicyRoots): string | undefined {
+  if (exec.name === 'managed_list') return inspectDirectory(String(record(exec.arguments)?.directory), roots).identity
   if (!['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'managed_file'].includes(exec.name)) return undefined
   const args = record(exec.arguments)
   const path = structuredFilePath(exec, roots)
-  const mutation = ['write', 'edit'].includes(exec.name) || (exec.name === 'str_replace_editor' && args?.command !== 'view') || (exec.name === 'managed_file' && args?.operation !== 'read')
-  return inspectStructuredPath(path, roots, mutation, exec.name === 'managed_file').identity
+  const mutation = ['write', 'edit'].includes(exec.name) || (exec.name === 'str_replace_editor' && args?.command !== 'view') || (exec.name === 'managed_file' && ['write', 'edit', 'trash'].includes(String(args?.operation)))
+  return inspectStructuredPath(path, roots, mutation, exec.name === 'managed_file', exec.name === 'managed_file' && ['stat', 'verify_recovery'].includes(String(args?.operation))).identity
 }

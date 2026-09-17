@@ -89,7 +89,10 @@ class FixtureAdapter extends LlmAdapter {
     trace({ event: 'model-request', sessionId: options.sessionId, child, step: step?.label ?? 'finish', cwdGuidance: options.system?.includes('/tmp'), autoGuidance: (String(options.system) + directText).includes('<auto_mode_policy>'), toolNames: (options.tools ?? []).map(tool => tool.name), bashHasSandboxField: Object.prototype.hasOwnProperty.call(bashSchema?.properties ?? {}, 'sandbox_permissions') })
     steps.set(key, index + 1)
     if (!step) { yield* textChunks(child ? 'AUTO_MODE_CHILD_PRODUCT_OK' : 'AUTO_MODE_PRODUCT_FIXTURE_OK'); return }
-    if (!options.tools?.some(tool => tool.name === step.name)) throw Error(`Fixture requires real product tool ${step.name}`)
+    const hiddenNegative = ['ordinary', 'widening', 'cleanup', 'delegation'].includes(step.label)
+    const advertised = options.tools?.some(tool => tool.name === step.name) === true
+    if (advertised === hiddenNegative) throw Error(`Unexpected Auto tool visibility for ${step.name}`)
+    // Deliberately emit hidden negative calls to exercise dispatch denial too.
     yield* toolChunks(step)
   }
 }
