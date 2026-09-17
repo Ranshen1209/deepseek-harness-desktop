@@ -6,6 +6,7 @@ import { Session } from '@deepseek-ai/dsh-session'
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { homedir } from 'node:os'
 
 const tracePath = process.env.AUTO_FIXTURE_TRACE
 const root = process.env.AUTO_FIXTURE_EFFECTS
@@ -25,6 +26,8 @@ const parentPlan = [
   { label: 'external-approved', name: 'managed_file', args: { operation: 'write', file_path: join(dirname(root), 'external.txt'), content: 'external approved' } },
   { label: 'external-read', name: 'managed_file', args: { operation: 'read', file_path: join(dirname(root), 'external.txt') } },
   { label: 'external-edit', name: 'managed_file', args: { operation: 'edit', file_path: join(dirname(root), 'external.txt'), old_string: 'approved', new_string: 'updated' } },
+  { label: 'external-read-edited', name: 'managed_file', args: { operation: 'read', file_path: join(dirname(root), 'external.txt') } },
+  { label: 'external-trash', name: 'managed_file', args: { operation: 'trash', file_path: join(dirname(root), 'external.txt') } },
   { label: 'write-rejected', name: 'write', args: { file_path: join(root, 'denied.txt'), content: 'must not exist' } },
   ...['ordinary', 'widening', 'cleanup'].map(label => ({ label, name: process.platform === 'win32' ? 'pwsh' : 'bash', args: {
     command: label === 'cleanup' ? (process.platform === 'win32' ? `Remove-Item -LiteralPath '${process.env.AUTO_FIXTURE_PROTECTED.replaceAll("'", "''")}'` : `rm '${process.env.AUTO_FIXTURE_PROTECTED}'`) : 'echo synthetic',
@@ -86,7 +89,7 @@ class FixtureAdapter extends LlmAdapter {
   }
 }
 export const name = 'auto-mode-product-fixture'
-export const inject = ['llm', 'tools', 'permissionPresets', 'agents', 'sessionController', 'agentDefaultModel', 'autoModeProtection']
+export const inject = ['llm', 'tools', 'permissionPresets', 'agents', 'sessions', 'approval', 'sessionController', 'agentDefaultModel', 'autoModeProtection']
 export async function apply(ctx) {
   ctx.llm.registerAdapter(['auto-mode-fixture'], new FixtureAdapter())
   ctx.on('approval/request', async (request, next) => {
@@ -107,6 +110,11 @@ export async function apply(ctx) {
   await (async () => {
       await ctx.agentDefaultModel.saveSelection({ provider: model.provider, model: model.id })
       const { sessionId } = await ctx.sessionController.create({ cwd: root })
+      const session = ctx.sessions.get(sessionId)
+      if (!session) throw Error('Desktop fixture session was not created')
+      const defaultPreset = ctx.permissionPresets.current(session)
+      ctx.permissionPresets.set(session, process.env.AUTO_FIXTURE_PRESET)
+      trace({ event: 'fixture-session', home: homedir(), cwd: session.header.cwd, defaultPreset, approval: ctx.approval.overrideOf(session) })
       await ctx.sessionController.selectModel({ sessionId, provider: model.provider, model: model.id })
       const abort = new AbortController()
       let release
@@ -117,7 +125,7 @@ export async function apply(ctx) {
       const timeout = setTimeout(() => { abort.abort(new Error('Desktop fixture timed out')); release() }, 60000)
       try {
         await ctx.sessionController.prompt({ sessionId, requestId: randomUUID(), mode: 'queue', content: [{
-          type: 'text', text: `Run the deterministic preservation fixture. Read and update isolated fixture files. Recycle only "${join(root, 'trash.txt')}" and create "${join(dirname(root), 'external.txt')}". Reject arbitrary commands and delegation.`,
+          type: 'text', text: `Run the deterministic preservation fixture. Read and update isolated fixture files. Recycle "${join(root, 'trash.txt')}". Create, read, edit and recycle "${join(dirname(root), 'external.txt')}". Reject arbitrary commands and delegation.`,
         }] }, abort.signal)
         await completed
         abort.signal.throwIfAborted()

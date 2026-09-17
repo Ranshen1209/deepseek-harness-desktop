@@ -139,9 +139,10 @@ export function isCriticalPath(target: string, roots: PolicyRoots): boolean {
   const critical = styleOf(normalized) === 'win32'
     ? []
     : ['/etc', '/bin', '/sbin', '/usr', '/system', '/library', '/private/etc', '/boot']
-  const credentialRoots = ['.ssh', '.gnupg', '.aws', '.azure', '.kube', '.config/gcloud']
-    .map(path => normalizePath(path, roots.home, roots.home))
-  return windowsCritical || [...critical, ...credentialRoots].some(root => isWithin(root, normalized))
+  const segments = normalized.toLowerCase().split(/[\\/]/)
+  const credentials = segments.some((part, index) => ['.ssh', '.gnupg', '.aws', '.azure', '.kube'].includes(part)
+    || (part === '.config' && segments[index + 1] === 'gcloud'))
+  return windowsCritical || credentials || critical.some(root => isWithin(root, normalized))
 }
 
 /** Whether a workspace path is protected metadata rather than ordinary project content. */
@@ -155,8 +156,8 @@ export function isProtectedProjectPath(target: string, roots: PolicyRoots): bool
   return ['.gitconfig', '.gitmodules', '.bashrc', '.bash_profile', '.zshrc', '.zprofile', '.profile', '.mcp.json', 'agents.md', 'claude.md', 'cordis.yml', 'cordis.patch.yml'].includes(base)
 }
 
-/** Deterministic destructive-target fuse. */
-export function hardDestructiveTargetReason(target: string, roots: PolicyRoots): string | undefined {
+/** Reject roots that cannot host structured file operations; a normal user home is eligible. */
+export function workspaceRootReason(target: string, roots: PolicyRoots): string | undefined {
   const namespaceReason = windowsDeviceNamespaceReason(target)
   if (namespaceReason !== undefined) return namespaceReason
   const canonicalTarget = canonicalizeWindowsNamespace(target)
@@ -170,9 +171,17 @@ export function hardDestructiveTargetReason(target: string, roots: PolicyRoots):
     })
     if (hasReservedDevice) return `Windows reserved device path ${normalized}`
   }
-  if (normalized === normalizePath(roots.home, roots.home)) return `user home root ${normalized}`
   if (isWithin(roots.dshHome, normalized)) return `DSH_HOME path ${normalized}`
   if (isCriticalPath(normalized, roots)) return `system or credential-critical path ${normalized}`
+  return undefined
+}
+
+/** Protect the home directory itself as well as system and Harness data targets. */
+export function hardDestructiveTargetReason(target: string, roots: PolicyRoots): string | undefined {
+  const reason = workspaceRootReason(target, roots)
+  if (reason !== undefined) return reason
+  const normalized = normalizePath(target, roots.workspace, roots.home)
+  if (normalized === normalizePath(roots.home, roots.home)) return `user home root ${normalized}`
   return undefined
 }
 

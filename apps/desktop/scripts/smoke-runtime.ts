@@ -21,6 +21,14 @@ export async function smokeDesktopRuntime(root: string, node: string, runtime: D
   fixture?: string
   resolution?: 'link' | 'runtime'
 } = {}): Promise<void> {
+  for (const preset of ['preservation', 'danger-full-access']) {
+    await smokeDesktopPreset(root, node, runtime, options, preset)
+  }
+}
+
+/** Verify each protected preset with the active workspace set to an isolated user home. */
+async function smokeDesktopPreset(root: string, node: string, runtime: DesktopRuntimeDescriptor,
+  options: { fixture?: string; resolution?: 'link' | 'runtime' }, preset: string): Promise<void> {
   const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-desktop-smoke-')))
   const home = join(scratch, 'home')
   const profile = join(home, 'profiles', 'desktop')
@@ -34,7 +42,8 @@ export async function smokeDesktopRuntime(root: string, node: string, runtime: D
   writeFileSync(join(effects, 'trash.txt'), 'recoverable')
   writeFileSync(canary, 'keep')
   const host = new DesktopHostProcess(node, root, profile, undefined, {
-    ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1',
+    ...process.env, HOME: effects, USERPROFILE: effects, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1',
+    AUTO_FIXTURE_PRESET: preset,
     AUTO_FIXTURE_EFFECTS: effects, AUTO_FIXTURE_TRACE: tracePath,
     AUTO_FIXTURE_DONE: donePath, AUTO_FIXTURE_PROTECTED: canary,
   })
@@ -103,17 +112,21 @@ export function apply(ctx) {
     const trace = readFileSync(tracePath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) as Array<Record<string, unknown>>
     const resultFor = (label: string): Record<string, unknown> | undefined => trace.find(event => event.event === 'tool-result' && event.label === label)
     const contents = (file: string): string | undefined => existsSync(join(effects, file)) ? readFileSync(join(effects, file), 'utf8') : undefined
-    const expected = { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'manual-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'write-rejected': true, ordinary: true, widening: true, cleanup: true, delegation: true }
+    const expected = { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'manual-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'external-read-edited': false, 'external-trash': false, 'write-rejected': true, ordinary: true, widening: true, cleanup: true, delegation: true }
     const reviews = trace.filter(event => event.event === 'model-review')
+    const session = trace.find(event => event.event === 'fixture-session')
     const assertions = {
       toolsSettled: Object.entries(expected).every(([label, isError]) => resultFor(label)?.isError === isError),
-      defaultProtection: trace.filter(event => event.event === 'tool-result').every(event => event.preset === 'preservation'),
-      freshReviews: reviews.length === 12,
+      defaultProtection: session?.defaultPreset === 'preservation' && trace.filter(event => event.event === 'tool-result').every(event => event.preset === preset),
+      homeWorkspace: session?.home === effects && session.cwd === effects,
+      approvalAvailable: session?.approval === 'ask',
+      freshReviews: reviews.length === 14,
       taskModel: reviews.every(event => event.provider === 'auto-mode-fixture' && event.model === 'deterministic'),
       approvedEdit: contents('existing.txt') === 'approved',
       approvedCreate: contents('approved.txt') === 'approved new file',
       reversibleTrash: contents('trash.txt') === undefined && readFileSync((resultFor('trash-approved')?.value as { recovery_path: string }).recovery_path, 'utf8') === 'recoverable',
-      exactExternalEdit: (resultFor('external-read')?.value as { content: string }).content === 'external approved' && readFileSync(join(scratch, 'external.txt'), 'utf8') === 'external updated',
+      exactExternalEdit: (resultFor('external-read')?.value as { content: string }).content === 'external approved' && (resultFor('external-read-edited')?.value as { content: string }).content === 'external updated',
+      externalTrash: !existsSync(join(scratch, 'external.txt')) && readFileSync((resultFor('external-trash')?.value as { recovery_path: string }).recovery_path, 'utf8') === 'external updated',
       rejectedChangesAbsent: ['denied', 'model-denied', 'model-error', 'model-invalid'].every(file => contents(`${file}.txt`) === undefined),
       canaryUnchanged: readFileSync(canary, 'utf8') === 'keep',
       exactManualCalls: trace.filter(event => event.event === 'manual-approval').map(event => event.label).sort().join(',') === 'manual-approved,write-rejected',
@@ -122,7 +135,7 @@ export function apply(ctx) {
     if (!Object.values(assertions).every(Boolean)) {
       throw new Error(`desktop runtime: preservation assertions failed: ${JSON.stringify({ assertions, trace })}`)
     }
-    process.stdout.write(`desktop preservation smoke: ${JSON.stringify({ realApi: false, assertions })}\n`)
+    process.stdout.write(`desktop preservation smoke: ${JSON.stringify({ realApi: false, preset, assertions })}\n`)
   } finally {
     await host.stop()
     rmSync(scratch, { recursive: true, force: true })

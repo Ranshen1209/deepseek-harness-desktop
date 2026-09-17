@@ -44,7 +44,7 @@
         name: Auto (legacy full access)
         description: This saved selection uses Auto protection. Unisolated commands and permanent deletion remain blocked; it does not grant unrestricted access.
         sandbox: danger-full-access
-        approval: never
+        approval: ask
 
 - insert:
     - id: desktop-preservation-policy

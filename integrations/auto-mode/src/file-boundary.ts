@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
-import { hardDestructiveTargetReason, normalizePath, resolveNativePath, type PolicyRoots } from './paths.js'
+import { hardDestructiveTargetReason, normalizePath, resolveNativePath, workspaceRootReason, type PolicyRoots } from './paths.js'
 
 /** Reject ambiguous names before normalization can erase their meaning. */
 export function ambiguousPathReason(input: string, windows = process.platform === 'win32'): string | undefined {
@@ -34,7 +34,9 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
   const ambiguous = ambiguousPathReason(input) ?? ambiguousPathReason(roots.workspace)
   if (ambiguous) throw Error(ambiguous)
   const workspace = resolveNativePath(roots.workspace, roots.workspace)
-  if (!isAbsolute(workspace) || hardDestructiveTargetReason(workspace, roots)) throw Error('unsafe workspace root')
+  if (!isAbsolute(workspace)) throw Error('workspace root must be absolute')
+  const rootReason = workspaceRootReason(workspace, roots)
+  if (rootReason !== undefined) throw Error(`unsafe workspace root: ${rootReason}`)
   const workspaceInfo = lstatSync(workspace, { bigint: true })
   if (!workspaceInfo.isDirectory() || workspaceInfo.isSymbolicLink() || workspaceInfo.ino === 0n) throw Error('unverifiable workspace directory')
   const target = resolve(workspace, input)

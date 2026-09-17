@@ -1,6 +1,6 @@
 {
   "name": "@nanmicoder/dsh-auto-mode",
-  "version": "0.3.0-alpha.2",
+  "version": "0.3.0-alpha.3",
   "description": "Preservation-first, fail-closed permission policy for DeepSeek Harness",
   "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
   "keywords": [
@@ -116,7 +116,7 @@
   "private": true,
   "sourcePin": {
     "repository": "https://github.com/Ranshen1209/dsh-auto-mode",
-    "commit": "c7f4dc39aec1ad76ec39b40304d5604822485b77",
+    "commit": "5dd14b991c33c00b6617ced1ef6ecdd01e1b8af8",
     "files": {
       "src/artifacts.ts": "0c8383de2dc93e6a8672830db9e9715397148f12b9d9466cf37b9630b0d5de22",
       "src/classifier.ts": "af7306b8943b877763bfcec495daa99d90b1f1934f91b3eead68d2759934964e",
@@ -125,18 +125,18 @@
       "src/client/locales.ts": "d7129cb8281ff59120cb5991b5f339bd0e3e8d325fec7bd3887de609946966a7",
       "src/dsh-classifier.ts": "7340c14469743fc95e1480c22e7e5fbdd9c05f051c6b25e661325cdf9fc2e5d5",
       "src/escalation.ts": "58198c44c16750b2a2a87ae1568984da5a19b564055de6c74568b1d6fc7fba56",
-      "src/file-boundary.ts": "2bdb3a930f32e89435be3861206a3c190ebd512cec7a7e6a4ea5e19303f18389",
+      "src/file-boundary.ts": "7142a7451daad9f9e03b06ef99e620d0b924a14a8f42a399865f69b9ae4c3641",
       "src/harness-compat.ts": "ffe31c701d36362344fdd4787b4bf92db04a3306e253e178886d745de025d1e8",
       "src/index.ts": "59f8b1bc158b09870ee0e5342fa686d4641837d1deb984cc5157fbb24f44226f",
       "src/managed-file.ts": "78c7d56b65b52ba124d1dd0cf9156624ba214462a95bb2dbe75bffaf679d5ef9",
       "src/patch.ts": "2fa9b8d1905ea3ffd2ed52d7420694fd6aea1cb56884ad10e290e5c38133aec1",
-      "src/paths.ts": "d55f80ba520d8485297a730ee9ab66499ad8096b015c95627ae624214185be92",
+      "src/paths.ts": "25c2ee2253aa223102b23237d1d1d67df3c02120de42cba3bd58c20f2d8400da",
       "src/policy.ts": "e8addd4996256d05a7df65b85cd5927563945cadc028ca6ec5bde14c8ff8e5a9",
       "src/review-audit.ts": "78d34362ca0b946c82855bbb7f542d3b5a89fcf5650064da4fbe12dd6519b5ec",
       "src/shell.ts": "7b77cfcfb8d3388db5d9941f4ac08356633448145baa3e6a6941dca051571287",
       "src/types.ts": "32f78a2642c887b5b41131da5cf3db4276bd2b26795474efe5fc8cd368fc0148",
-      "src/upstream-review/index.ts": "26a077447cd5d2a81d69f4cabf427396a9c62d41e21470da48bc01bd660e43c1",
-      "src/upstream-review/LICENSE": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+      "src/upstream-review/LICENSE": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be",
+      "src/upstream-review/index.ts": "26a077447cd5d2a81d69f4cabf427396a9c62d41e21470da48bc01bd660e43c1"
     },
     "lineEndings": "LF"
   }
