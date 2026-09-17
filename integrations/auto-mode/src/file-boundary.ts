@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
-import { hardDestructiveTargetReason, isWithin, normalizePath, type PolicyRoots } from './paths.js'
+import { hardDestructiveTargetReason, normalizePath, resolveNativePath, type PolicyRoots } from './paths.js'
 
 /** Reject ambiguous names before normalization can erase their meaning. */
 export function ambiguousPathReason(input: string, windows = process.platform === 'win32'): string | undefined {
@@ -22,7 +22,7 @@ export function ambiguousPathReason(input: string, windows = process.platform ==
   return undefined
 }
 
-export interface FileBoundary { readonly path: string; readonly identity: string }
+export interface FileBoundary { readonly path: string; readonly nativePath: string; readonly identity: string; readonly withinWorkspace: boolean }
 
 /**
  * Inspect the actual local file and every ancestor. No links are followed for
@@ -30,13 +30,15 @@ export interface FileBoundary { readonly path: string; readonly identity: string
  * Trusted host/filesystem code must still prevent a concurrent replacement
  * between the tool guard and its own open/write operation.
  */
-export function inspectStructuredPath(input: string, roots: PolicyRoots, mutation: boolean): FileBoundary {
+export function inspectStructuredPath(input: string, roots: PolicyRoots, mutation: boolean, allowOutside = false): FileBoundary {
   const ambiguous = ambiguousPathReason(input) ?? ambiguousPathReason(roots.workspace)
   if (ambiguous) throw Error(ambiguous)
-  const workspace = normalizePath(roots.workspace, roots.workspace)
+  const workspace = resolveNativePath(roots.workspace, roots.workspace)
   if (!isAbsolute(workspace) || hardDestructiveTargetReason(workspace, roots)) throw Error('unsafe workspace root')
+  const workspaceInfo = lstatSync(workspace, { bigint: true })
+  if (!workspaceInfo.isDirectory() || workspaceInfo.isSymbolicLink() || workspaceInfo.ino === 0n) throw Error('unverifiable workspace directory')
   const target = resolve(workspace, input)
-  if (!isWithin(workspace, target) || normalizePath(target, workspace) === workspace) throw Error('target must be a file strictly inside the workspace')
+  if (normalizePath(target, workspace) === normalizePath(workspace, workspace)) throw Error('target must be an exact file, not the workspace root')
   if (hardDestructiveTargetReason(target, roots)) throw Error('protected file target')
   const parts: string[] = []
   let current = target
@@ -46,7 +48,8 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
     if (parent === current) break
     current = parent
   }
-  const identity: unknown[] = []
+  const identity: unknown[] = [['workspace', workspace, String(workspaceInfo.dev), String(workspaceInfo.ino)]]
+  let withinWorkspace = false
   for (const part of parts) {
     let info
     try { info = lstatSync(part, { bigint: true }) } catch (error) {
@@ -61,6 +64,7 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
     if (normalizePath(realpathSync.native(part), workspace) !== normalizePath(part, workspace)) throw Error('filesystem alias is not authorized')
     if (part !== target) {
       if (!info.isDirectory()) throw Error('ancestor is not a directory')
+      if (info.dev === workspaceInfo.dev && info.ino === workspaceInfo.ino) withinWorkspace = true
       identity.push([part, String(info.dev), String(info.ino), String(info.mode)])
     } else {
       if (!info.isFile() || info.nlink !== 1n) throw Error('target must be a regular file with exactly one link')
@@ -69,5 +73,6 @@ export function inspectStructuredPath(input: string, roots: PolicyRoots, mutatio
         createHash('sha256').update(readFileSync(part)).digest('hex')])
     }
   }
-  return { path: normalizePath(target, workspace), identity: JSON.stringify(identity) }
+  if (!allowOutside && !withinWorkspace) throw Error('target is outside the actual workspace directory')
+  return { path: normalizePath(target, workspace), nativePath: target, identity: JSON.stringify(identity), withinWorkspace }
 }

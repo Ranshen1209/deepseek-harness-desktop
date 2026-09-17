@@ -5,7 +5,7 @@ export const PERMISSION_ACCESS_NS = 'permission.access'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'preset.preservation': '模型审查与文件保护',
+  'preset.preservation': 'Auto',
   'title': '权限',
   'description': '选择新会话的默认权限模式',
   'loading': '加载中',
@@ -25,7 +25,7 @@ export type PermissionSettingsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'preset.preservation': 'Preservation',
+  'preset.preservation': 'Auto',
   'title': 'Permission',
   'description': 'Choose the default permission mode for new sessions',
   'loading': 'Loading',
@@ -42,7 +42,7 @@ export const en = {
 
 /** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
-  'preset.preservation': '模型审查与文件保护',
+  'preset.preservation': 'Auto',
   'mode': '访问模式，当前：{name}',
   'close': '关闭',
   'preset.readOnly': '仅可查看',
@@ -67,7 +67,7 @@ export type PermissionAccessKey = keyof typeof accessZh
 
 /** English dictionary for the current-session popup gate. */
 export const accessEn = {
-  'preset.preservation': 'Preservation',
+  'preset.preservation': 'Auto',
   'mode': 'Access mode, current: {name}',
   'close': 'Close',
   'preset.readOnly': 'Read Only',

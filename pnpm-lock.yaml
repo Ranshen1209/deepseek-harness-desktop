@@ -829,6 +829,9 @@ importers:
       '@deepseek-ai/dsh-permission-presets':
         specifier: workspace:*
         version: link:../../packages/interaction/permission-presets
+      '@deepseek-ai/dsh-sandbox-policy':
+        specifier: workspace:*
+        version: link:../../packages/sandbox/sandbox-policy
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../packages/core/session

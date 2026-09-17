@@ -1,4 +1,5 @@
 import { lstatSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { ArtifactRegistry } from './artifacts.js'
 import { patchGuardPaths, patchPayloadsForGuard } from './patch.js'
@@ -38,8 +39,10 @@ export function structuredFilePath(exec: Readonly<ToolExecution>, roots: PolicyR
   const key = exec.name === 'str_replace_editor' ? 'path' : 'file_path'
   const path = args?.[key]
   if (typeof path !== 'string') throw Error(`missing exact ${key}`)
-  return inspectStructuredPath(path, roots, ['write', 'edit'].includes(exec.name) ||
-    (exec.name === 'str_replace_editor' && args?.command !== 'view')).path
+  const inspected = inspectStructuredPath(path, roots, ['write', 'edit'].includes(exec.name) ||
+    (exec.name === 'str_replace_editor' && args?.command !== 'view') ||
+    (exec.name === 'managed_file' && args?.operation !== 'read'), exec.name === 'managed_file')
+  return inspected.nativePath
 }
 
 function serializedArguments(argumentsValue: unknown): string {
@@ -197,6 +200,23 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
   }
   const path = pathArgument(args)
   if (typeof args?.path === 'string' && typeof args?.file_path === 'string' && args.path !== args.file_path) return { decision: 'deny', reason: 'ambiguous target fields', classifierEligible: false }
+  if (exec.name === 'managed_file') {
+    if (path === undefined || !isAbsolute(path) || !['read', 'write', 'edit', 'trash'].includes(String(args?.operation))) {
+      return { decision: 'deny', reason: 'managed_file requires one absolute file path and a supported operation', classifierEligible: false }
+    }
+    let normalized: string
+    try { normalized = structuredFilePath(exec, roots) }
+    catch (error) { return { decision: 'deny', reason: `unverifiable file boundary: ${String(error)}`, classifierEligible: false } }
+    if (isProtectedProjectPath(normalized, roots) || sensitiveReadPath(normalized)) {
+      return { decision: 'deny', reason: 'managed_file cannot access credentials, security metadata or recovery records', classifierEligible: false }
+    }
+    if (args?.operation !== 'write' && !existedBefore(normalized)) {
+      return { decision: 'deny', reason: 'this operation requires an existing regular file', classifierEligible: false }
+    }
+    return { decision: 'ask', reason: 'this exact file operation requires task authorization; outside-workspace targets and recycling require an explicit user target or one-time confirmation', classifierEligible: false,
+      ...(args?.operation === 'read' ? {} : { filesystemEffects: [{ kind: args?.operation === 'trash' ? 'recycle' as const : 'create-or-overwrite' as const, path: normalized, existedBefore: existedBefore(normalized) }] }),
+    }
+  }
   const view = exec.name === 'str_replace_editor' && args?.command === 'view'
   if (['read', 'read_image'].includes(exec.name) || view) {
     if (path === undefined || path.trim() === '') return { decision: 'deny', reason: 'read target is missing', classifierEligible: false }
@@ -223,7 +243,7 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
       return { decision: 'deny', reason: 'Auto cannot mutate outside-workspace files, credentials or executable security metadata', classifierEligible: false }
     }
     return {
-      decision: 'ask', reason: 'exact structured file modification requires manual approval; no model or conversation text can grant it', classifierEligible: false,
+      decision: 'ask', reason: 'exact structured file modification requires fresh model authorization or single-use manual confirmation', classifierEligible: false,
       filesystemEffects: [{ kind: 'create-or-overwrite', path: normalized, existedBefore: existedBefore(normalized) }],
     }
   }
@@ -234,11 +254,11 @@ export function assessTool(exec: Readonly<ToolExecution>, roots: PolicyRoots, ar
   return { decision: 'deny', reason: `Auto has no verified non-destructive execution contract for tool: ${exec.name}`, classifierEligible: false }
 }
 
-/** Full file identity included in the exact manual approval, never in model input. */
+/** Full file identity bound to each exact authorization, never sent as model input. */
 export function fileApprovalIdentity(exec: Readonly<ToolExecution>, roots: PolicyRoots): string | undefined {
-  if (!['read', 'read_image', 'write', 'edit', 'str_replace_editor'].includes(exec.name)) return undefined
+  if (!['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'managed_file'].includes(exec.name)) return undefined
   const args = record(exec.arguments)
   const path = structuredFilePath(exec, roots)
-  const mutation = ['write', 'edit'].includes(exec.name) || (exec.name === 'str_replace_editor' && args?.command !== 'view')
-  return inspectStructuredPath(path, roots, mutation).identity
+  const mutation = ['write', 'edit'].includes(exec.name) || (exec.name === 'str_replace_editor' && args?.command !== 'view') || (exec.name === 'managed_file' && args?.operation !== 'read')
+  return inspectStructuredPath(path, roots, mutation, exec.name === 'managed_file').identity
 }

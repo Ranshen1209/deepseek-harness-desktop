@@ -81,8 +81,8 @@ export function canonicalizePosixSystemAlias(path: string, platform: NodeJS.Plat
   return path
 }
 
-/** Normalize an absolute or cwd-relative user path without following links. */
-export function normalizePath(input: string, cwd: string, userHome = homedir()): string {
+/** Resolve path syntax without following links or losing native filename case. */
+export function resolveNativePath(input: string, cwd: string, userHome = homedir()): string {
   const canonicalInput = canonicalizeWindowsNamespace(input)
   const expanded = canonicalInput === '~'
     ? userHome
@@ -93,21 +93,27 @@ export function normalizePath(input: string, cwd: string, userHome = homedir()):
   const api = pathApi(style)
   const absolute = api.isAbsolute(expanded) ? expanded : api.resolve(cwd, expanded)
   const normalized = api.normalize(absolute)
-  return style === 'win32' ? normalizeWindowsSegments(normalized).toLowerCase() : canonicalizePosixSystemAlias(normalized)
+  return style === 'win32' ? normalizeWindowsSegments(normalized) : canonicalizePosixSystemAlias(normalized)
+}
+
+/** Case-folded comparison for conservative deny rules, never filesystem authority. */
+export function normalizePath(input: string, cwd: string, userHome = homedir()): string {
+  const path = resolveNativePath(input, cwd, userHome)
+  return styleOf(path) === 'win32' ? path.toLowerCase() : path
 }
 
 /** Resolve runtime roots from the active workspace and current process environment. */
 export function resolveRoots(activeWorkspace: string | undefined, options: RootOptions = {}): PolicyRoots {
-  const home = normalizePath(options.home ?? homedir(), options.home ?? homedir(), options.home ?? homedir())
-  const workspace = normalizePath(activeWorkspace ?? options.workspaceRoot ?? process.cwd(), process.cwd(), home)
+  const home = resolveNativePath(options.home ?? homedir(), options.home ?? homedir(), options.home ?? homedir())
+  const workspace = resolveNativePath(activeWorkspace ?? options.workspaceRoot ?? process.cwd(), process.cwd(), home)
   const environmentDshHome = process.env.DSH_HOME?.trim()
   const configuredDshHome = options.dshHome ?? (environmentDshHome === '' ? undefined : environmentDshHome)
-  const dshHome = normalizePath(configuredDshHome ?? posix.join(home, '.dsh'), workspace, home)
-  const tempRoots = (options.tempRoots ?? [tmpdir()]).map(root => normalizePath(root, workspace, home))
+  const dshHome = resolveNativePath(configuredDshHome ?? posix.join(home, '.dsh'), workspace, home)
+  const tempRoots = (options.tempRoots ?? [tmpdir()]).map(root => resolveNativePath(root, workspace, home))
   return { workspace, home, dshHome, tempRoots }
 }
 
-/** Whether target equals root or is contained below it. */
+/** Lexical containment only; structured file authority also checks ancestor identities. */
 export function isWithin(root: string, target: string): boolean {
   const normalizedRoot = normalizePath(root, root)
   const normalizedTarget = normalizePath(target, root)
@@ -141,12 +147,10 @@ export function isCriticalPath(target: string, roots: PolicyRoots): boolean {
 /** Whether a workspace path is protected metadata rather than ordinary project content. */
 export function isProtectedProjectPath(target: string, roots: PolicyRoots): boolean {
   const normalized = normalizePath(target, roots.workspace, roots.home)
-  if (!isWithin(roots.workspace, normalized)) return false
   const style = styleOf(roots.workspace)
   const api = pathApi(style)
-  const relative = api.relative(roots.workspace, normalized).replaceAll('\\', '/')
-  const segments = relative.toLowerCase().split('/')
-  if (segments.some(part => ['.git', '.vscode', '.idea', '.husky', '.dsh', '.codex', '.claude', '.github'].includes(part))) return true
+  const segments = normalized.toLowerCase().split(/[\\/]/)
+  if (segments.some(part => ['.git', '.vscode', '.idea', '.husky', '.dsh', '.codex', '.claude', '.github', '.auto-recovery'].includes(part))) return true
   const base = api.basename(normalized).toLowerCase()
   return ['.gitconfig', '.gitmodules', '.bashrc', '.bash_profile', '.zshrc', '.zprofile', '.profile', '.mcp.json', 'agents.md', 'claude.md', 'cordis.yml', 'cordis.patch.yml'].includes(base)
 }
@@ -166,7 +170,7 @@ export function hardDestructiveTargetReason(target: string, roots: PolicyRoots):
     })
     if (hasReservedDevice) return `Windows reserved device path ${normalized}`
   }
-  if (normalized === roots.home) return `user home root ${normalized}`
+  if (normalized === normalizePath(roots.home, roots.home)) return `user home root ${normalized}`
   if (isWithin(roots.dshHome, normalized)) return `DSH_HOME path ${normalized}`
   if (isCriticalPath(normalized, roots)) return `system or credential-critical path ${normalized}`
   return undefined

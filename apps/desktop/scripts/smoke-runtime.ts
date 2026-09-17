@@ -31,6 +31,7 @@ export async function smokeDesktopRuntime(root: string, node: string, runtime: D
   mkdirSync(home)
   mkdirSync(effects)
   writeFileSync(join(effects, 'existing.txt'), 'valuable')
+  writeFileSync(join(effects, 'trash.txt'), 'recoverable')
   writeFileSync(canary, 'keep')
   const host = new DesktopHostProcess(node, root, profile, undefined, {
     ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1',
@@ -102,19 +103,21 @@ export function apply(ctx) {
     const trace = readFileSync(tracePath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) as Array<Record<string, unknown>>
     const resultFor = (label: string): Record<string, unknown> | undefined => trace.find(event => event.event === 'tool-result' && event.label === label)
     const contents = (file: string): string | undefined => existsSync(join(effects, file)) ? readFileSync(join(effects, file), 'utf8') : undefined
-    const expected = { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'write-rejected': true, ordinary: true, widening: true, cleanup: true, delegation: true }
+    const expected = { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'manual-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'write-rejected': true, ordinary: true, widening: true, cleanup: true, delegation: true }
     const reviews = trace.filter(event => event.event === 'model-review')
     const assertions = {
       toolsSettled: Object.entries(expected).every(([label, isError]) => resultFor(label)?.isError === isError),
       defaultProtection: trace.filter(event => event.event === 'tool-result').every(event => event.preset === 'preservation'),
-      freshReviews: reviews.length === 7,
+      freshReviews: reviews.length === 12,
       taskModel: reviews.every(event => event.provider === 'auto-mode-fixture' && event.model === 'deterministic'),
       approvedEdit: contents('existing.txt') === 'approved',
       approvedCreate: contents('approved.txt') === 'approved new file',
+      reversibleTrash: contents('trash.txt') === undefined && readFileSync((resultFor('trash-approved')?.value as { recovery_path: string }).recovery_path, 'utf8') === 'recoverable',
+      exactExternalEdit: (resultFor('external-read')?.value as { content: string }).content === 'external approved' && readFileSync(join(scratch, 'external.txt'), 'utf8') === 'external updated',
       rejectedChangesAbsent: ['denied', 'model-denied', 'model-error', 'model-invalid'].every(file => contents(`${file}.txt`) === undefined),
       canaryUnchanged: readFileSync(canary, 'utf8') === 'keep',
-      exactManualCalls: trace.filter(event => event.event === 'manual-approval').map(event => event.label).sort().join(',') === 'edit-approved,write-approved,write-rejected',
-      approvalsAudited: trace.filter(event => event.event === 'approval/asked').length === 3 && trace.filter(event => event.event === 'approval/decided').length === 3,
+      exactManualCalls: trace.filter(event => event.event === 'manual-approval').map(event => event.label).sort().join(',') === 'manual-approved,write-rejected',
+      approvalsAudited: trace.filter(event => event.event === 'approval/asked').length === 2 && trace.filter(event => event.event === 'approval/decided').length === 2,
     }
     if (!Object.values(assertions).every(Boolean)) {
       throw new Error(`desktop runtime: preservation assertions failed: ${JSON.stringify({ assertions, trace })}`)

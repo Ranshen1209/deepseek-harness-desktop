@@ -5,7 +5,7 @@ import { PermissionPresetService } from '@deepseek-ai/dsh-permission-presets'
 import { Session } from '@deepseek-ai/dsh-session'
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 
 const tracePath = process.env.AUTO_FIXTURE_TRACE
 const root = process.env.AUTO_FIXTURE_EFFECTS
@@ -20,6 +20,11 @@ const parentPlan = [
   ...['model-denied', 'model-error', 'model-invalid'].map(label => ({ label, name: 'write', args: { file_path: join(root, label + '.txt'), content: 'must not exist' } })),
   { label: 'edit-approved', name: 'edit', args: { file_path: join(root, 'existing.txt'), old_string: 'valuable', new_string: 'approved' } },
   { label: 'write-approved', name: 'write', args: { file_path: join(root, 'approved.txt'), content: 'approved new file' } },
+  { label: 'manual-approved', name: 'write', args: { file_path: join(root, 'confirmed.txt'), content: 'confirmed' } },
+  { label: 'trash-approved', name: 'managed_file', args: { operation: 'trash', file_path: join(root, 'trash.txt') } },
+  { label: 'external-approved', name: 'managed_file', args: { operation: 'write', file_path: join(dirname(root), 'external.txt'), content: 'external approved' } },
+  { label: 'external-read', name: 'managed_file', args: { operation: 'read', file_path: join(dirname(root), 'external.txt') } },
+  { label: 'external-edit', name: 'managed_file', args: { operation: 'edit', file_path: join(dirname(root), 'external.txt'), old_string: 'approved', new_string: 'updated' } },
   { label: 'write-rejected', name: 'write', args: { file_path: join(root, 'denied.txt'), content: 'must not exist' } },
   ...['ordinary', 'widening', 'cleanup'].map(label => ({ label, name: process.platform === 'win32' ? 'pwsh' : 'bash', args: {
     command: label === 'cleanup' ? (process.platform === 'win32' ? `Remove-Item -LiteralPath '${process.env.AUTO_FIXTURE_PROTECTED.replaceAll("'", "''")}'` : `rm '${process.env.AUTO_FIXTURE_PROTECTED}'`) : 'echo synthetic',
@@ -59,7 +64,7 @@ class FixtureAdapter extends LlmAdapter {
       const text = options.messages.flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n')
       const action = JSON.parse(text.split('PENDING_ACTION\n\n')[1])
       const mode = action.arguments?.file_path?.split(/[\\/]/).at(-1)
-      const decision = mode === 'model-denied.txt' ? 'deny' : 'allow'
+      const decision = mode === 'model-denied.txt' ? 'deny' : ['confirmed.txt', 'denied.txt'].includes(mode) ? 'ask' : 'allow'
       trace({ event: 'model-review', action: action.name, file: mode, decision, provider: options.provider, model: options.model })
       if (mode === 'model-error.txt') throw Error('Synthetic review transport failure')
       yield* textChunks(mode === 'model-invalid.txt' ? '{"decision":"allow"}' : JSON.stringify({ risk: action.name === 'read' ? 'low' : 'medium', decision }))
@@ -94,7 +99,7 @@ export async function apply(ctx) {
   ctx.on('tools/result', (exec, result) => {
     const label = calls.get(String(exec.callId))
     if (!label) return
-    trace({ event: 'tool-result', label, name: exec.name, isError: result.isError, error: result.isError ? result.error?.message : undefined, value: !result.isError && exec.name === 'bash' ? result.value : undefined, sessionId: exec.agent?.session.id, cwd: exec.agent?.session.header.cwd, child: exec.agent?.session.header.origin === 'subagent', sessionIdentityMatches: exec.agent?.session instanceof Session, preset: exec.agent ? ctx.permissionPresets.current(exec.agent.session) : undefined })
+    trace({ event: 'tool-result', label, name: exec.name, isError: result.isError, error: result.isError ? result.error?.message : undefined, value: !result.isError ? result.value : undefined, sessionId: exec.agent?.session.id, cwd: exec.agent?.session.header.cwd, child: exec.agent?.session.header.origin === 'subagent', sessionIdentityMatches: exec.agent?.session instanceof Session, preset: exec.agent ? ctx.permissionPresets.current(exec.agent.session) : undefined })
   })
   ctx.on('session/event', (session, event) => {
     if (event.type === 'approval/asked' || event.type === 'approval/decided') trace({ event: event.type, sessionId: session.id, data: event.data })
@@ -112,7 +117,7 @@ export async function apply(ctx) {
       const timeout = setTimeout(() => { abort.abort(new Error('Desktop fixture timed out')); release() }, 60000)
       try {
         await ctx.sessionController.prompt({ sessionId, requestId: randomUUID(), mode: 'queue', content: [{
-          type: 'text', text: 'Run the deterministic preservation fixture. Only read and approved structured edits of isolated fixture files are authorized; reject arbitrary commands and delegation.',
+          type: 'text', text: `Run the deterministic preservation fixture. Read and update isolated fixture files. Recycle only "${join(root, 'trash.txt')}" and create "${join(dirname(root), 'external.txt')}". Reject arbitrary commands and delegation.`,
         }] }, abort.signal)
         await completed
         abort.signal.throwIfAborted()

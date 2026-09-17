@@ -2,7 +2,7 @@ import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 
 /** High-confidence literal filesystem effect observed before execution. */
 export interface FilesystemEffect {
-  readonly kind: 'create-or-overwrite' | 'delete'
+  readonly kind: 'create-or-overwrite' | 'delete' | 'recycle'
   readonly path: string
   readonly existedBefore: boolean
 }

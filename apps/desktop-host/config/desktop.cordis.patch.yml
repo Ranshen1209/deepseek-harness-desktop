@@ -33,16 +33,16 @@
       preservation:
         sandbox: workspace-write
         approval: ask
-        name: Preservation
-        description: Every admissible call receives model risk and authorization review. Exact file edits still require manual approval. Unisolated execution and deletion are blocked in this desktop release.
+        name: Auto
+        description: Model-reviewed task operations run automatically. Unclear authority requires confirmation. Exact external files and reversible single-file trash are supported; unisolated commands and permanent deletion remain blocked.
       workspace-write:
-        name: Preservation (legacy workspace mode)
-        description: This saved permission selection remains protected by model review, manual file approval and deletion blocking.
+        name: Auto (legacy workspace)
+        description: 'This saved selection uses Auto: model-reviewed file operations and reversible single-file trash, with confirmation when authority is unclear.'
         sandbox: workspace-write
         approval: ask
       danger-full-access:
-        name: Preservation (legacy full access)
-        description: Full access is unavailable in this protected desktop. Model review, manual file approval and deletion blocking remain enforced.
+        name: Auto (legacy full access)
+        description: This saved selection uses Auto protection. Unisolated commands and permanent deletion remain blocked; it does not grant unrestricted access.
         sandbox: danger-full-access
         approval: never
 
