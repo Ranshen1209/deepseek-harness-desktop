@@ -20,6 +20,8 @@ import type { DesktopRuntimeDescriptor } from '../src/runtime-tree.ts'
 export async function smokeDesktopRuntime(root: string, node: string, runtime: DesktopRuntimeDescriptor, options: {
   fixture?: string
   resolution?: 'link' | 'runtime'
+  realReview?: boolean
+  model?: string
 } = {}): Promise<void> {
   for (const preset of ['preservation', 'danger-full-access']) {
     await smokeDesktopPreset(root, node, runtime, options, preset)
@@ -28,7 +30,8 @@ export async function smokeDesktopRuntime(root: string, node: string, runtime: D
 
 /** Verify each protected preset with the active workspace set to an isolated user home. */
 async function smokeDesktopPreset(root: string, node: string, runtime: DesktopRuntimeDescriptor,
-  options: { fixture?: string; resolution?: 'link' | 'runtime' }, preset: string): Promise<void> {
+  options: { fixture?: string; resolution?: 'link' | 'runtime'; realReview?: boolean; model?: string }, preset: string): Promise<void> {
+  if (options.realReview && !process.env.DEEPSEEK_API_KEY) throw new Error('Real review smoke requires DEEPSEEK_API_KEY in the test process environment')
   const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-desktop-smoke-')))
   const home = join(scratch, 'home')
   const profile = join(home, 'profiles', 'desktop')
@@ -44,6 +47,8 @@ async function smokeDesktopPreset(root: string, node: string, runtime: DesktopRu
   const host = new DesktopHostProcess(node, root, profile, undefined, {
     ...process.env, HOME: effects, USERPROFILE: effects, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1',
     AUTO_FIXTURE_PRESET: preset,
+    AUTO_FIXTURE_REAL_API: options.realReview ? '1' : '0',
+    AUTO_FIXTURE_MODEL: options.model ?? 'deepseek-flash',
     AUTO_FIXTURE_EFFECTS: effects, AUTO_FIXTURE_TRACE: tracePath,
     AUTO_FIXTURE_DONE: donePath, AUTO_FIXTURE_PROTECTED: canary,
   })
@@ -67,7 +72,8 @@ export function apply(ctx) {
     copyFileSync(options.fixture ?? fileURLToPath(new URL('../tests/fixtures/harness-runtime-llm.mjs', import.meta.url)), join(plugin, 'fixture.mjs'))
     writeFileSync(join(plugin, 'bundle.yml'), `
 - id: llm-deepseek
-  disabled: true
+  disabled: ${options.realReview ? 'false' : 'true'}
+  ${options.realReview ? 'config: { protocol: messages, baseURL: https://api.deepseek.com/anthropic }' : ''}
 - id: llm-pi-ai
   disabled: true
 - id: session-title-llm
@@ -96,7 +102,7 @@ export function apply(ctx) {
     const ready = await Promise.race([
       host.start(),
       new Promise<never>((_resolve, reject) => {
-        timer = globalThis.setTimeout(() => { reject(new Error('desktop runtime: host smoke startup timed out')) }, 90_000)
+        timer = globalThis.setTimeout(() => { reject(new Error('desktop runtime: host smoke startup timed out')) }, options.realReview ? 270_000 : 90_000)
       }),
     ]).finally(() => { clearTimeout(timer) })
     if (ready.dshVersion !== runtime.release.version) throw new Error('desktop runtime: Host reported another dsh release')
@@ -104,7 +110,7 @@ export function apply(ctx) {
     if (response.status !== 200 || !(await response.text()).includes('<html')) {
       throw new Error('desktop runtime: packaged frontend smoke failed')
     }
-    const deadline = Date.now() + 75_000
+    const deadline = Date.now() + (options.realReview ? 240_000 : 75_000)
     while (!existsSync(donePath) && Date.now() < deadline) await setTimeout(100)
     if (!existsSync(donePath)) throw new Error('desktop runtime: preservation fixture did not finish')
     const completion = JSON.parse(readFileSync(donePath, 'utf8')) as { completed?: boolean; error?: string }
@@ -112,30 +118,45 @@ export function apply(ctx) {
     const trace = readFileSync(tracePath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) as Array<Record<string, unknown>>
     const resultFor = (label: string): Record<string, unknown> | undefined => trace.find(event => event.event === 'tool-result' && event.label === label)
     const contents = (file: string): string | undefined => existsSync(join(effects, file)) ? readFileSync(join(effects, file), 'utf8') : undefined
-    const expected = { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'manual-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'external-read-edited': false, 'external-trash': false, 'write-rejected': true, ordinary: true, widening: true, cleanup: true, delegation: true }
+    const recoveredContents = (label: string): string | undefined => {
+      const file = (resultFor(label)?.value as { recovery_path?: string } | undefined)?.recovery_path
+      return file !== undefined && existsSync(file) ? readFileSync(file, 'utf8') : undefined
+    }
+    const expected = options.realReview
+      ? { read: false, 'edit-approved': false, 'write-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'external-read-edited': false, 'external-trash': false, 'goal-read': false, ordinary: true, widening: true, cleanup: true, delegation: true }
+      : { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'manual-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'external-read-edited': false, 'external-trash': false, 'write-rejected': true, ordinary: true, widening: true, cleanup: true, delegation: true }
     const reviews = trace.filter(event => event.event === 'model-review')
+    const reviewedResults = trace.filter(event => event.event === 'tool-result' && !['ordinary', 'widening', 'cleanup', 'delegation'].includes(String(event.label)))
     const session = trace.find(event => event.event === 'fixture-session')
     const assertions = {
       toolsSettled: Object.entries(expected).every(([label, isError]) => resultFor(label)?.isError === isError),
       defaultProtection: session?.defaultPreset === 'preservation' && trace.filter(event => event.event === 'tool-result').every(event => event.preset === preset),
       homeWorkspace: session?.home === effects && session.cwd === effects,
       approvalAvailable: session?.approval === 'ask',
-      freshReviews: reviews.length === 14,
-      taskModel: reviews.every(event => event.provider === 'auto-mode-fixture' && event.model === 'deterministic'),
+      freshReviews: reviews.length === (options.realReview ? 10 : 14),
+      taskModel: reviews.every(event => event.provider === (options.realReview ? 'deepseek-official' : 'auto-mode-fixture') && event.model === (options.realReview ? options.model ?? 'deepseek-flash' : 'deterministic')),
+      ...(options.realReview ? {
+        deepseekMax: reviews.every(event => event.reasoningEffort === 'max' && event.finish === 'stop'),
+        goalReadable: resultFor('goal-read')?.isError === false,
+        reviewsMatchCalls: reviews.length === reviewedResults.length
+          && reviews.every((review, index) => review.action === reviewedResults[index]?.name
+            && review.argumentsSha256 === reviewedResults[index]?.argumentsSha256),
+      } : {}),
       approvedEdit: contents('existing.txt') === 'approved',
       approvedCreate: contents('approved.txt') === 'approved new file',
-      reversibleTrash: contents('trash.txt') === undefined && readFileSync((resultFor('trash-approved')?.value as { recovery_path: string }).recovery_path, 'utf8') === 'recoverable',
-      exactExternalEdit: (resultFor('external-read')?.value as { content: string }).content === 'external approved' && (resultFor('external-read-edited')?.value as { content: string }).content === 'external updated',
-      externalTrash: !existsSync(join(scratch, 'external.txt')) && readFileSync((resultFor('external-trash')?.value as { recovery_path: string }).recovery_path, 'utf8') === 'external updated',
+      reversibleTrash: contents('trash.txt') === undefined && recoveredContents('trash-approved') === 'recoverable',
+      exactExternalEdit: (resultFor('external-read')?.value as { content: string } | undefined)?.content === 'external approved'
+        && (resultFor('external-read-edited')?.value as { content: string } | undefined)?.content === 'external updated',
+      externalTrash: !existsSync(join(scratch, 'external.txt')) && recoveredContents('external-trash') === 'external updated',
       rejectedChangesAbsent: ['denied', 'model-denied', 'model-error', 'model-invalid'].every(file => contents(`${file}.txt`) === undefined),
       canaryUnchanged: readFileSync(canary, 'utf8') === 'keep',
-      exactManualCalls: trace.filter(event => event.event === 'manual-approval').map(event => event.label).sort().join(',') === 'manual-approved,write-rejected',
-      approvalsAudited: trace.filter(event => event.event === 'approval/asked').length === 2 && trace.filter(event => event.event === 'approval/decided').length === 2,
+      exactManualCalls: trace.filter(event => event.event === 'manual-approval').map(event => event.label).sort().join(',') === (options.realReview ? '' : 'manual-approved,write-rejected'),
+      approvalsAudited: trace.filter(event => event.event === 'approval/asked').length === (options.realReview ? 0 : 2) && trace.filter(event => event.event === 'approval/decided').length === (options.realReview ? 0 : 2),
     }
     if (!Object.values(assertions).every(Boolean)) {
       throw new Error(`desktop runtime: preservation assertions failed: ${JSON.stringify({ assertions, trace })}`)
     }
-    process.stdout.write(`desktop preservation smoke: ${JSON.stringify({ realApi: false, preset, assertions })}\n`)
+    process.stdout.write(`desktop preservation smoke: ${JSON.stringify({ realApi: options.realReview === true, preset, ...(options.realReview ? { model: options.model ?? 'deepseek-flash', reviews } : {}), assertions })}\n`)
   } finally {
     await host.stop()
     rmSync(scratch, { recursive: true, force: true })

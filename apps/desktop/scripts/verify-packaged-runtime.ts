@@ -37,6 +37,6 @@ const result = await execute(executable, [
   join(output, 'packaged-preservation-smoke.mjs'),
   join(resources, 'app.asar', 'dsh'),
   join(appRoot, 'tests/fixtures/harness-runtime-llm.mjs'),
-], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, timeout: 150_000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 })
+], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, timeout: process.env.DSH_SMOKE_REAL_REVIEW === '1' ? 600_000 : 150_000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 })
 process.stdout.write(result.stdout)
 process.stderr.write(result.stderr)

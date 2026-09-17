@@ -53,6 +53,7 @@
         presetName: preservation
         enforceAllSessions: true
         modelReview: true
+        reviewTimeoutMs: 120000
 
     - id: directory-picker-native
       name: '@deepseek-ai/dsh-host-directory-picker-native'

@@ -8,7 +8,7 @@ import type { PreToolDecision, ToolExecution, ToolExecutionResult } from '@deeps
 import type { FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-fs'
 import { sanitizeClassifierText } from './classifier.js'
-import { classifyRisk, snapshotAutoReview } from './upstream-review/index.js'
+import { AutoReviewFailure, classifyRisk, snapshotAutoReview } from './upstream-review/index.js'
 import { assertHarnessCompatibility, sessionEventsNewestFirst } from './harness-compat.js'
 import { normalizePath, resolveRoots, type RootOptions } from './paths.js'
 import { inspectStructuredPath } from './file-boundary.js'
@@ -254,7 +254,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   const tickets = new Map<symbol, Ticket>()
   const observed = new Map<symbol, { agent: ToolExecution['agent']; authority: ToolExecution['agent']; presetHistory: string }>()
   const dispatched = new Set<symbol>()
-  const reviews = new Map<symbol, { fingerprint: string; expires: number; decision: 'allow' | 'ask'; risk: 'low' | 'medium'; provider: string; model: string; reason?: string }>()
+  const reviews = new Map<symbol, { fingerprint: string; expires: number; decision: 'allow' | 'ask'; risk: 'low' | 'medium'; provider: string; model: string; reasoningEffort?: string; reason?: string }>()
   const presetHistory = (agent: ToolExecution['agent']): string => JSON.stringify(agent === undefined ? [] :
     Array.from(sessionEventsNewestFirst(agent.session)).filter(event => event.type === 'permission/preset' || String(event.type) === 'sandbox/mode' || event.type === 'approval/policy'))
   let active = true
@@ -390,9 +390,12 @@ export function apply(ctx: Context, config: Config = {}): void {
         const snapshot = snapshotAutoReview(exec.agent, exec)
         reviews.set(exec.token, { fingerprint: expected, expires: Date.now() + 120_000, decision: decision.decision, risk: decision.risk,
           provider: snapshot.provider, model: snapshot.model,
+          ...(decision.reasoningEffort === undefined ? {} : { reasoningEffort: decision.reasoningEffort }),
           ...(decision.decision === 'ask' && decision.reason !== undefined ? { reason: decision.reason } : {}) })
-      } catch {
-        return { kind: 'deny', reason: '[auto-mode model review unavailable, invalid or expired] operation did not execute' }
+      } catch (error) {
+        const code = exec.signal.aborted || disposal.signal.aborted ? 'cancelled'
+          : signal.aborted ? 'timeout' : error instanceof AutoReviewFailure ? error.code : 'context-invalid'
+        return { kind: 'deny', reason: `[auto-mode model review failed: ${code}] operation did not execute` }
       } finally {
         if (cancel !== undefined) signal.removeEventListener('abort', cancel)
       }
@@ -469,6 +472,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     const review = reviews.get(exec.token)
     const finishAudit = review === undefined ? undefined : beginReviewAudit(rootsFor(exec).dshHome, {
       provider: review.provider, model: review.model, risk: review.risk, decision: review.decision,
+      ...(review.reasoningEffort === undefined ? {} : { reasoningEffort: review.reasoningEffort }),
       fingerprint: review.fingerprint, approvedBy: ticket?.approvedBy ?? 'model',
       tool: exec.name, callId: exec.callId, sessionId: exec.agent?.session.header.id,
     })

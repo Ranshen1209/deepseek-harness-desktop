@@ -1,6 +1,6 @@
 {
   "name": "@nanmicoder/dsh-auto-mode",
-  "version": "0.3.0-alpha.3",
+  "version": "0.3.0-alpha.4",
   "description": "Preservation-first, fail-closed permission policy for DeepSeek Harness",
   "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
   "keywords": [
@@ -116,7 +116,7 @@
   "private": true,
   "sourcePin": {
     "repository": "https://github.com/Ranshen1209/dsh-auto-mode",
-    "commit": "5dd14b991c33c00b6617ced1ef6ecdd01e1b8af8",
+    "commit": "23bd49c987c356e00e597d432ddaa4c5ff37c698",
     "files": {
       "src/artifacts.ts": "0c8383de2dc93e6a8672830db9e9715397148f12b9d9466cf37b9630b0d5de22",
       "src/classifier.ts": "af7306b8943b877763bfcec495daa99d90b1f1934f91b3eead68d2759934964e",
@@ -127,7 +127,7 @@
       "src/escalation.ts": "58198c44c16750b2a2a87ae1568984da5a19b564055de6c74568b1d6fc7fba56",
       "src/file-boundary.ts": "7142a7451daad9f9e03b06ef99e620d0b924a14a8f42a399865f69b9ae4c3641",
       "src/harness-compat.ts": "ffe31c701d36362344fdd4787b4bf92db04a3306e253e178886d745de025d1e8",
-      "src/index.ts": "59f8b1bc158b09870ee0e5342fa686d4641837d1deb984cc5157fbb24f44226f",
+      "src/index.ts": "055b60ff22002d8753ce59ad107f5824b15d8bf8ded3f682b2a01ab56197743f",
       "src/managed-file.ts": "78c7d56b65b52ba124d1dd0cf9156624ba214462a95bb2dbe75bffaf679d5ef9",
       "src/patch.ts": "2fa9b8d1905ea3ffd2ed52d7420694fd6aea1cb56884ad10e290e5c38133aec1",
       "src/paths.ts": "25c2ee2253aa223102b23237d1d1d67df3c02120de42cba3bd58c20f2d8400da",
@@ -136,7 +136,7 @@
       "src/shell.ts": "7b77cfcfb8d3388db5d9941f4ac08356633448145baa3e6a6941dca051571287",
       "src/types.ts": "32f78a2642c887b5b41131da5cf3db4276bd2b26795474efe5fc8cd368fc0148",
       "src/upstream-review/LICENSE": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be",
-      "src/upstream-review/index.ts": "26a077447cd5d2a81d69f4cabf427396a9c62d41e21470da48bc01bd660e43c1"
+      "src/upstream-review/index.ts": "74a758b6d3262254aba5890eb7d52433a2773ad37b9a4f2016391456626b766e"
     },
     "lineEndings": "LF"
   }
