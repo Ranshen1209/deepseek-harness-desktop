@@ -43,8 +43,6 @@ Through `ctx.fs` you can resolve any path to a stable target identity, read a wh
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Execution-policy and read-snapshot waterfalls allow an exact reviewed file operation to use its approved leaf and verified bytes. A provider without an overriding listener retains the native policy and read path; a snapshot is not a general filesystem capability.
-
 This section explains the design decisions behind the contract and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy

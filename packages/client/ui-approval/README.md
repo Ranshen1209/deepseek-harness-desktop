@@ -40,7 +40,7 @@ None; approval request and response rendering does not alter a model request.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-Auto requests can display the model execution recommendation, purpose, authorization basis, scope and consequences beside complete call details. Desktop notification navigation selects only a matching live request and never answers it; native requests need no model explanation.
+Native approval requests display the reason and complete correlated call details. Desktop notification navigation selects only a matching live request and never answers it. Official Auto returns allow or deny without an additional manual approval card.
 
 None.
 

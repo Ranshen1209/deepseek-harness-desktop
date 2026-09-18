@@ -74,8 +74,6 @@ A composition with no executor provider never activates the tool. Background cal
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Auto authorization uses the captured executor and resolved command. Wider retries consume the exact call grant; background calls with a launch guard wait for startup so a settled tool cannot discard an unconsumed authorization.
-
 This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy

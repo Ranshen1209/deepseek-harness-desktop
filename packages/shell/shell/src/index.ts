@@ -40,17 +40,6 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     shell: ShellExecutor
   }
-  interface Events {
-    /**
-     * Bind a resolved tool invocation to its final native launch.
-     * @param actor - the same-process tool execution.
-     * @param provider - the captured executor that will receive the spec.
-     * @param spec - complete execution inputs before launch.
-     * @param next - remaining authorization listeners.
-     * @mode waterfall
-     */
-    'shell/authorize'(actor: object, provider: ShellExecutor, spec: ShellExecSpec, next: () => Promise<ShellExecSpec>): Promise<ShellExecSpec>
-  }
 }
 
 /**
@@ -87,16 +76,6 @@ export abstract class ShellExecutor extends Service {
     return undefined
   }
 
-  /** Whether this provider consumes beforeSpawn immediately before each native launch. @returns supported launch protocol version. */
-  get launchGuardVersion(): number { return 0 }
-
-  /**
-   * Capture executable selection and cleaned process inputs for exact-call approval.
-   * @param _spec - resolved execution inputs.
-   * @returns an opaque comparison value; callers must not log it or send it to a model.
-   */
-  executionIdentity(_spec: ShellExecSpec): string { throw new Error('Shell provider does not support execution identity') }
-
   /**
    * Apply implementation-owned defaults and caps to a request before execution.
    * @param request - the caller's request; omitted fields get this
@@ -104,16 +83,6 @@ export abstract class ShellExecutor extends Service {
    * @returns the fully-specified spec to hand to {@link run}/{@link start}.
    */
   abstract resolve(request: ShellExecRequest): ShellExecSpec
-
-  /**
-   * Check execution infrastructure without launching the requested command.
-   * @param _spec - resolved command and requested sandbox policy.
-   * @returns actual confinement facts available for approval.
-   * @throws when this provider has no supported preflight or setup fails.
-   */
-  preflight(_spec: ShellExecSpec): Promise<{ mode: string; enforcement: string }> {
-    return Promise.reject(new Error('Shell provider does not support execution preflight'))
-  }
 
   /**
    * Run preparation and the foreground command under the resolved timeout.

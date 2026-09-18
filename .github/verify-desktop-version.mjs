@@ -1,23 +1,22 @@
 /** Verify the release tag, Desktop manifests, prepared seed, and installer filenames. */
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
-import { appendFileSync, readFileSync, statSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const manifest = file => JSON.parse(readFileSync(resolve(root, file), 'utf8'))
 const version = manifest('package.json').version
-const integrationRoot = 'integrations/auto-mode'
-const desktopHosts = manifest(`${integrationRoot}/compatibility.json`).supportedHosts
-  .filter(host => host.track === 'desktop').map(host => host.version)
-assert.deepEqual(desktopHosts, [version], 'Bundled protection policy must target this exact Desktop version')
-const sourcePin = manifest(`${integrationRoot}/package.json`).sourcePin
-assert.match(sourcePin.commit, /^[a-f0-9]{40}$/)
-assert.equal(sourcePin.lineEndings, 'LF')
-for (const [file, expected] of Object.entries(sourcePin.files)) {
-  assert.equal(createHash('sha256').update(readFileSync(resolve(root, integrationRoot, file))).digest('hex'), expected, `Bundled plugin source differs from its fork pin: ${file}`)
-}
+const officialAuto = '@deepseek-ai/dsh-experimental-auto-review'
+const retiredAuto = '@nanmicoder/dsh-auto-mode'
+const hostDependencies = manifest('apps/desktop-host/package.json').dependencies
+assert.ok(Object.hasOwn(hostDependencies, officialAuto), 'Desktop must depend on official Auto review')
+assert.ok(!Object.hasOwn(hostDependencies, retiredAuto), 'Desktop must not depend on retired Auto')
+assert.ok(!existsSync(resolve(root, 'integrations/auto-mode')), 'Retired Auto source must not be present')
+assert.equal(manifest('packages/experimental/auto-review/package.json').version, version, 'Official Auto version differs from dsh')
+const desktopPatch = readFileSync(resolve(root, 'apps/desktop-host/config/desktop.cordis.patch.yml'), 'utf8')
+assert.ok(desktopPatch.includes(`name: '${officialAuto}'`), 'Desktop must activate official Auto review')
+assert.ok(!desktopPatch.includes(retiredAuto), 'Desktop must not activate retired Auto')
 assert.match(version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
 for (const app of ['cli', 'desktop', 'desktop-host']) {
   assert.equal(manifest(`apps/${app}/package.json`).version, version, `${app} version differs from dsh`)

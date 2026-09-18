@@ -76,8 +76,6 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 <details>
 <summary>实现细节——点击展开</summary>
 
-执行器在隔离准备后、启动前检查传入的最终启动授权。解析后的 argv、环境和工作目录构成执行身份；后台启动在完成该启动决定后才结束准备。
-
 本节解释执行器的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计概念

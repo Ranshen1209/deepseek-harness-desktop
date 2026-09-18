@@ -10,7 +10,7 @@ The custom preservation reviewer and execution adapters introduced service-injec
 
 ## Decision
 
-Desktop activates the official experimental auto-review package through its existing composition row. Its review source, response protocol, reasoning defaults, Full access execution and cancellation behavior remain unchanged. The custom package is removed from the desktop production dependency closure and build steps. Dormant optional filesystem and shell events have no custom listener; existing native execution remains their fallback. The official package's [decision](../feature/2026-08-28-auto-review.md) owns the review semantics.
+Desktop activates the official experimental auto-review package through its existing composition row. Its review source, response protocol, reasoning defaults, Full access execution and cancellation behavior remain unchanged. The custom package, workspace registration and build command are deleted. Filesystem, search and Shell execution no longer expose the custom approval hooks. Historical approval records remain readable without a writer or an execution grant. The small Host admission check and dispatch guard only enforce explicit reselection of retired or inconsistent saved permissions. The official package's [decision](../feature/2026-08-28-auto-review.md) owns the review semantics.
 
 This decision supersedes the custom Auto choice in [the earlier desktop note](2026-09-18-desktop-native-auto-approval.md). Persisted preservation selections resolve to Custom and require an explicit choice. Desktop's remaining admission check only stops unresolved saved permission states; it does not review or restrict official Auto tools. The official enablement confirmation remains visible. New-session defaults remain native.
 

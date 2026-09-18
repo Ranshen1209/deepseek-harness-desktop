@@ -43,7 +43,7 @@ const childPlan = [{ label: 'child-read', name: 'read', args: { file_path: join(
 const calls = new Map()
 const steps = new Map()
 let sequence = 0
-const model = { provider: realApi ? 'deepseek-official' : 'auto-mode-fixture', id: realApi ? process.env.AUTO_FIXTURE_MODEL : 'deterministic', name: 'Auto Mode test route', context: { contextWindow: 262144 }, defaultMaxTokens: 8192, reasoning: { efforts: [{ id: 'low', name: 'low' }], defaultEffort: 'low' } }
+const model = { provider: realApi ? 'deepseek-official' : 'official-auto-fixture', id: realApi ? process.env.AUTO_FIXTURE_MODEL : 'deterministic', name: 'Auto Mode test route', context: { contextWindow: 262144 }, defaultMaxTokens: 8192, reasoning: { efforts: [{ id: 'low', name: 'low' }], defaultEffort: 'low' } }
 function* textChunks(text) {
   yield { type: 'block-start', index: 0, blockType: 'text' }
   yield { type: 'text-delta', index: 0, text }
@@ -91,7 +91,7 @@ class FixtureAdapter extends LlmAdapter {
     yield* toolChunks(step)
   }
 }
-export const name = 'auto-mode-product-fixture'
+export const name = 'official-auto-product-fixture'
 export const inject = ['llm', 'tools', 'permissionPresets', 'agents', 'sessions', 'approval', 'sessionController', 'agentDefaultModel']
 export async function apply(ctx) {
   if (realApi) {
@@ -109,7 +109,7 @@ export async function apply(ctx) {
       }
       trace({ event: 'model-review', action: action.name, argumentsSha256: argumentsSha256(action.arguments), provider: options.provider, model: options.model, reasoningEffort: options.reasoningEffort, elapsedMs: Date.now() - started, finish, response: text })
     })
-  } else ctx.llm.registerAdapter(['auto-mode-fixture'], new FixtureAdapter())
+  } else ctx.llm.registerAdapter(['official-auto-fixture'], new FixtureAdapter())
   ctx.on('approval/request', async (request, next) => {
     const label = calls.get(String(request.callId))
     if (!label) return next()

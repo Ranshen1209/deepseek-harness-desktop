@@ -31,7 +31,7 @@ export function ApprovalRequestId(id: string): ApprovalRequestId {
  */
 export type ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
 
-/** Durable facts supplied to a model reviewer, never human authorization. */
+/** Retired reviewer facts retained for reading existing session logs; never execution authority. */
 export interface ReviewExecutionFacts {
   readonly file?: {
     readonly path: string
@@ -54,39 +54,22 @@ export interface ReviewExecutionFacts {
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
-    /** Exact inspected facts sent to the reviewer; history and pending call are already logged. */
+    /** Historical inspected facts from the retired reviewer; retained for session-log compatibility. */
     'approval/review-input': { callId: ToolCallId; facts: ReviewExecutionFacts }
-    /** One execution grant; reload never turns this audit record into a reusable permission. */
+    /** Historical execution audit; reading it never grants permission to execute. */
     'approval/call-authorized': { callId: ToolCallId; toolName: string; fingerprint: string; approvedBy: 'model' | 'human'; workdir: string; mode: string; provider: string }
-    /** Successfully committed structured file version; separate from task authorization. */
+    /** Historical structured file-version audit; reading it never authorizes another mutation. */
     'approval/file-committed': { callId: ToolCallId; path: string; identityHash: string; source: 'created' | 'modified' }
   }
 }
 
-/** Complete model explanation attached only to Auto's suggested execution. */
+/** Retired review explanation retained only in existing approval audit records. */
 export interface ApprovalReview {
   readonly recommendation: 'execute'
   readonly purpose: string
   readonly authorization: string
   readonly scope: string
   readonly consequences: string
-}
-
-/** Same-process execution identity; never transmitted to an answerer or persisted. */
-export interface ApprovalExecution {
-  readonly token: symbol
-  readonly parameters: unknown
-  readonly provider: object
-  readonly workdir: string
-  readonly requestedMode: string
-}
-
-/** The executor asks whether an existing per-call authorization covers its exact request. */
-export interface ExecutionApprovalRequest {
-  readonly agent: Agent
-  readonly toolName: string
-  readonly callId: ToolCallId
-  readonly execution: ApprovalExecution
 }
 
 declare module '@deepseek-ai/dsh-session/types' {
@@ -104,6 +87,7 @@ declare module '@deepseek-ai/dsh-session/types' {
       toolName: string
       callId?: ToolCallId
       reason?: string
+      /** Retired review explanation preserved when an existing log is read. */
       review?: ApprovalReview
     }
     /**
@@ -130,22 +114,12 @@ export interface ApprovalRequestEvent {
   readonly callId?: ToolCallId
   /** Human-readable reason supplied by the asker. */
   readonly reason?: string
-  /** Model execution recommendation, only supplied by Auto. */
-  readonly review?: ApprovalReview
   /** Cancellation lifetime of the pending request. */
   readonly signal?: AbortSignal
 }
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    /**
-     * Consume an exact execution grant before creating a second approval question.
-     * Undefined delegates to normal approval; every other outcome is final.
-     * @param req - same-process execution identity supplied by the executor.
-     * @mode waterfall
-     */
-    'approval/consume-execution'(req: ExecutionApprovalRequest, next: () => Promise<ApprovalOutcome | undefined>): Promise<ApprovalOutcome | undefined>
-
     /**
      * Ask composed answerers for one decision. Return an outcome to claim the
      * request or call `next()` to delegate. Scope-filtered dispatch

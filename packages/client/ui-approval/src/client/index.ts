@@ -1,5 +1,4 @@
 /** Browser approval consumer over the existing scoped Remote Event waterfall. */
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
@@ -46,7 +45,6 @@ async function answerApproval(
   const pending = new PendingApproval(sessionId, {
     toolName: request.toolName,
     ...(request.id === undefined ? {} : { id: request.id }),
-    ...(request.review === undefined ? {} : { review: request.review }),
     ...(request.callId === undefined
       ? {}
       : { callId: request.callId }),
@@ -100,7 +98,7 @@ export function apply(ctx: ClientContext): void {
     const current = pending.get(requested.requestId)
     if (current === undefined || current.sessionId !== requested.sessionId) return
     if (!ctx.uiSession.focusPendingInteraction(current.sessionId, current.key)) return
-    ctx.sessions.open(current.sessionId as SessionId)
+    ctx.sessions.open(current.sessionId)
     requested = undefined
   }
   const onPending = (value: PendingApproval): (() => void) => {

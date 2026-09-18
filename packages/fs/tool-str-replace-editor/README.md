@@ -60,8 +60,6 @@ A metadata miss from `view`, `str_replace`, or `insert` records confirmed absenc
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Exact reviewed reads use the optional file snapshot and mutations use the resolved per-call policy. Native callers without these listeners keep the original conditional version and observation requirements.
-
 This section explains the design decisions behind the editor tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

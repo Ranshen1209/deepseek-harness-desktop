@@ -67,8 +67,6 @@ Tool results end with a machine-readable exit marker — `[exit code: N]` or `[k
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Providers explicitly advertise preflight, execution identity and final-launch authorization support. The beforeSpawn callback runs after confinement and before the sole process launch. Unsupported providers fail preflight instead of implying isolation or silently widening access.
-
 This section explains the design of the seam and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design philosophy

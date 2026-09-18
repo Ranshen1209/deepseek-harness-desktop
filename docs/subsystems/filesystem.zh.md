@@ -277,20 +277,6 @@ type FsErrorCode =
 
 `FileSystem`（`ctx.fs`，abstract）拥有提供方原语：`resolve`、`processPath`、`processPathFromHostPath`、`fileUrl`、`contains`、`stat`、`lstat`、`readText`、`streamText`、`readBytes`、`listDir`、`writeText` 与 `editText`。`dsh-fs-observation-policy` **不注册服务**。它通过 `fs/*` 事件门禁添加策略，根据未见、缺失或存在状态对写入与编辑意图 waterfall 作出决策，并记录 `FsObservation` 值。执行器是 `dsh-tool-fs`：它通过 `ctx.fs` 读取、写入或编辑，分发 waterfall，并 emit 记录事件。下方生成的 [`ctx.fs` 小节](#ctxfs--filesystem-abstract-seam) 展示确切的 `ctx.fs` 签名。
 
-### `SearchPlan`
-
-```ts type-equiv
-/** Fixed native search arguments and final file-identity validation. */
-interface SearchPlan {
-  readonly batches: readonly { argv: readonly string[]; stdin?: string }[]
-  readonly project: (stdout: string) => string
-  readonly beforeSpawn: () => void
-  readonly validate: () => void
-}
-```
-
-审核后的调用可通过 fs/read-snapshot 提供已核实字节，或通过 fs/execution-policy 提供精确目标执行策略。没有监听器的原生调用保持原文件行为。SearchPlan 为原生 ripgrep 提供有界 stdin 快照和逐批验证。这些结构化路径不接管 Shell 脚本内部任意文件操作。
-
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -491,26 +477,6 @@ Single-slot decision for the next FileSystem.editText. Calling `next()` yields a
 
 Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
-<a id="fsexecution-policy--waterfall"></a>
-
-#### `fs/execution-policy` — waterfall
-
-Resolve an already-approved tool's exact file policy before mutation.
-
-```ts cordis-catalog
-/**
- * Resolve an already-approved tool's exact file policy before mutation.
- * @param actor - opaque tool execution used to validate a per-call file grant.
- * @param policy - native standing policy; non-participating listeners preserve it.
- * @mode waterfall
- */
-'fs/execution-policy'(actor: object, policy: SandboxExecutionPolicy | undefined, next: () => Promise<SandboxExecutionPolicy | undefined>): Promise<SandboxExecutionPolicy | undefined>
-```
-
-Types: [SandboxExecutionPolicy](sandbox.zh.md)
-
-Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
-
 <a id="fsobserved--emit"></a>
 
 #### `fs/observed` — emit
@@ -528,25 +494,6 @@ Record an authoritative positive or negative observation. Listeners must be sync
  * @mode emit
  */
 'fs/observed'(target: FsTarget, observation: FsObservation, actor: object | undefined): void
-```
-
-Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
-
-<a id="fsread-snapshot--waterfall"></a>
-
-#### `fs/read-snapshot` — waterfall
-
-Supply bytes from the exact reviewed file version.
-
-```ts cordis-catalog
-/**
- * Supply bytes from the exact reviewed file version.
- * @param actor - the same-process execution owning the approval.
- * @param target - provider-resolved file to read.
- * @param next - remaining readers; undefined preserves native reading.
- * @mode waterfall
- */
-'fs/read-snapshot'(actor: object, target: FsTarget, next: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>
 ```
 
 Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
@@ -570,28 +517,4 @@ Single-slot decision for the next FileSystem.writeText. Calling `next()` yields 
 ```
 
 Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
-
-<a id="fs-search-events"></a>
-
-### `fs-search/*` events
-
-<a id="fs-searchplan--waterfall"></a>
-
-#### `fs-search/plan` — waterfall
-
-Restrict a native search to inspected files before spawning ripgrep.
-
-```ts cordis-catalog
-/**
- * Restrict a native search to inspected files before spawning ripgrep.
- * @param exec - reviewed tool execution.
- * @param argv - native fixed argument template, including model patterns as data.
- * @mode waterfall
- */
-'fs-search/plan'(exec: ToolExecution, argv: readonly string[], next: () => Promise<SearchPlan | undefined>): Promise<SearchPlan | undefined>
-```
-
-Types: [ToolExecution](tools.zh.md)
-
-Source: [`packages/fs/tool-fs-search/src/search-core.ts`](../../packages/fs/tool-fs-search/src/search-core.ts)
 <!-- END GENERATED cordis-surface -->

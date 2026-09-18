@@ -442,18 +442,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Approval service that applies session policy before answerers and logs every ask/outcome pair to the requesting session. It exposes deterministic policy changes to the model through the runtime-context snapshot and switch notices.',
     methods: [
       {
-        signature: 'readonly executionApprovalVersion: number = 1',
-        description: 'Version of the exact-execution grant handshake supported by this service.',
-        parameters: [],
-      },
-      {
         signature: 'setPolicy(agent: Agent, policy: ApprovalPolicy): void',
         description: 'Switch one live agent\'s policy and queue the transition for its next model step. Session initialization uses setApprovalPolicy directly because there is no previously visible policy to change.',
         parameters: [{ name: 'agent', description: 'the live agent whose policy is changing.' }, { name: 'policy', description: 'the new effective policy.' }],
       },
       {
         signature: 'async request(req: ApprovalRequest): Promise<ApprovalOutcome>',
-        description: 'Ask the composed answerers to decide one readonly same-process request. The service borrows the agent, session, and live signal and adds an audit id to the dispatched request. A matching execution grant is consumed before creating another pending request or notification. The request requires an open turn because the audit pair must be enclosed by the durable log\'s commit/replay boundary; an idle ask rejects before appending anything. The answerer phase always produces an outcome: an aborted signal yields `\'cancelled\'`, a missing or throwing answerer yields `\'unavailable\'` (fail closed), and a rogue non-vocabulary return value is normalized to `\'unavailable\'`. A failure that prevents either audit append from committing still rejects because returning an unlogged decision would violate the pair. Session contains post-commit observer failures, so an authoritative append cannot reject the request or suppress its matching audit event.',
+        description: 'Ask the composed answerers to decide one readonly same-process request. The service borrows the agent, session, and live signal and adds the audit id to the dispatched request so answerers and notifications share its identity. The request requires an open turn because the audit pair must be enclosed by the durable log\'s commit/replay boundary; an idle ask rejects before appending anything. The answerer phase always produces an outcome: an aborted signal yields `\'cancelled\'`, a missing or throwing answerer yields `\'unavailable\'` (fail closed), and a rogue non-vocabulary return value is normalized to `\'unavailable\'`. A failure that prevents either audit append from committing still rejects because returning an unlogged decision would violate the pair. Session contains post-commit observer failures, so an authoritative append cannot reject the request or suppress its matching audit event.',
         parameters: [{ name: 'req', description: 'the pending decision (agent, tool identity, reason, signal).' }],
         returns: 'the closed outcome; `\'allowed-once\'` is the only grant.',
         throws: ['when no turn is open or either audit event fails before the session append commit point.'],
@@ -2161,23 +2156,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Abstract bash execution service. Subclass, implement the abstract methods, and load the subclass as a plugin — it registers as `ctx.shell` (one implementation per context; loading a second throws, which is cordis\' standard duplicate-service behavior).\n\nImplementations must honor these semantics:\n\n- run rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a ShellRunResult.\n- start resolves after launch preparation; cancellation or setup failure rejects before publishing a handle. No timeout applies to background processes. Once published, `done` settles at process close and never rejects; subprocess provider failures settle as `killed` with the error on stderr.\n- ShellProcess.readOutput is incremental: consecutive reads never repeat output. Lossy reads report truncation and available spill files.\n- A still-running background process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a background process survives an executor-only reload.',
     methods: [
       {
-        signature: 'executionIdentity(_spec: ShellExecSpec): string',
-        description: 'Capture executable selection and cleaned process inputs for exact-call approval.',
-        parameters: [{ name: '_spec', description: 'resolved execution inputs.' }],
-        returns: 'an opaque comparison value; callers must not log it or send it to a model.',
-      },
-      {
         signature: 'abstract resolve(request: ShellExecRequest): ShellExecSpec',
         description: 'Apply implementation-owned defaults and caps to a request before execution.',
         parameters: [{ name: 'request', description: 'the caller\'s request; omitted fields get this implementation\'s defaults, capped fields are clamped.' }],
         returns: 'the fully-specified spec to hand to {@link run}/{@link start}.',
-      },
-      {
-        signature: 'preflight(_spec: ShellExecSpec): Promise<{ mode: string; enforcement: string }>',
-        description: 'Check execution infrastructure without launching the requested command.',
-        parameters: [{ name: '_spec', description: 'resolved command and requested sandbox policy.' }],
-        returns: 'actual confinement facts available for approval.',
-        throws: ['when this provider has no supported preflight or setup fails.'],
       },
       {
         signature: 'abstract run(spec: ShellExecSpec): Promise<ShellRunResult>',
@@ -3333,14 +3315,6 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'sessionId', description: 'Agent and Session identity.' }, { name: 'running', description: 'whether the Agent is running.' }],
   },
   {
-    name: 'approval/consume-execution',
-    mode: 'waterfall',
-    signature: '\'approval/consume-execution\'(req: ExecutionApprovalRequest, next: () => Promise<ApprovalOutcome | undefined>): Promise<ApprovalOutcome | undefined>',
-    summary: 'Consume an exact execution grant before creating a second approval question.',
-    description: 'Consume an exact execution grant before creating a second approval question. Undefined delegates to normal approval; every other outcome is final.',
-    parameters: [{ name: 'req', description: 'same-process execution identity supplied by the executor.' }],
-  },
-  {
     name: 'approval/request',
     mode: 'waterfall',
     signature: '\'approval/request\'( this: Scoped<Agent>, req: ApprovalRequestEvent, next: () => Promise<ApprovalOutcome>, ): Promise<ApprovalOutcome>',
@@ -3453,14 +3427,6 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'inspection', description: 'committed canonical prefix, including the feedback as its last event.' }],
   },
   {
-    name: 'fs-search/plan',
-    mode: 'waterfall',
-    signature: '\'fs-search/plan\'(exec: ToolExecution, argv: readonly string[], next: () => Promise<SearchPlan | undefined>): Promise<SearchPlan | undefined>',
-    summary: 'Restrict a native search to inspected files before spawning ripgrep.',
-    description: 'Restrict a native search to inspected files before spawning ripgrep.',
-    parameters: [{ name: 'exec', description: 'reviewed tool execution.' }, { name: 'argv', description: 'native fixed argument template, including model patterns as data.' }],
-  },
-  {
     name: 'fs/edit-intent',
     mode: 'waterfall',
     signature: '\'fs/edit-intent\'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>',
@@ -3469,28 +3435,12 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'target', description: 'the resolved target about to be edited.' }, { name: 'actor', description: 'the opaque tool-execution context the decider keys off.' }],
   },
   {
-    name: 'fs/execution-policy',
-    mode: 'waterfall',
-    signature: '\'fs/execution-policy\'(actor: object, policy: SandboxExecutionPolicy | undefined, next: () => Promise<SandboxExecutionPolicy | undefined>): Promise<SandboxExecutionPolicy | undefined>',
-    summary: 'Resolve an already-approved tool\'s exact file policy before mutation.',
-    description: 'Resolve an already-approved tool\'s exact file policy before mutation.',
-    parameters: [{ name: 'actor', description: 'opaque tool execution used to validate a per-call file grant.' }, { name: 'policy', description: 'native standing policy; non-participating listeners preserve it.' }],
-  },
-  {
     name: 'fs/observed',
     mode: 'emit',
     signature: '\'fs/observed\'(target: FsTarget, observation: FsObservation, actor: object | undefined): void',
     summary: 'Record an authoritative positive or negative observation.',
     description: 'Record an authoritative positive or negative observation. Listeners must be synchronous recorders: throws fail the tool call and returned promises are not awaited.',
     parameters: [{ name: 'target', description: 'the target whose presence or absence was observed.' }, { name: 'observation', description: 'present with its version, or confirmed absent.' }, { name: 'actor', description: 'the observing tool-execution context; undefined records nothing useful.' }],
-  },
-  {
-    name: 'fs/read-snapshot',
-    mode: 'waterfall',
-    signature: '\'fs/read-snapshot\'(actor: object, target: FsTarget, next: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>',
-    summary: 'Supply bytes from the exact reviewed file version.',
-    description: 'Supply bytes from the exact reviewed file version.',
-    parameters: [{ name: 'actor', description: 'the same-process execution owning the approval.' }, { name: 'target', description: 'provider-resolved file to read.' }, { name: 'next', description: 'remaining readers; undefined preserves native reading.' }],
   },
   {
     name: 'fs/write-intent',
@@ -3595,14 +3545,6 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Committed change to one registered namespace\'s resolved value.',
     description: 'Committed change to one registered namespace\'s resolved value. Emitted after the provider persisted (for `update`) or published (`provider`) the change; never emitted when the resolved value is deep-equal. Listener failures are contained and logged — a sync throw and an async rejection alike — except `INVARIANT`-coded failures, which rethrow after every listener ran; that rethrow reaches the emitter only from synchronous listeners, so invariant checks on this event must not be async functions.',
     parameters: [{ name: 'ns', description: 'the namespace whose resolved value changed.' }, { name: 'next', description: 'the new resolved value.' }, { name: 'prev', description: 'the previous resolved value.' }, { name: 'source', description: 'whether the change entered through `update()` or the provider.' }],
-  },
-  {
-    name: 'shell/authorize',
-    mode: 'waterfall',
-    signature: '\'shell/authorize\'(actor: object, provider: ShellExecutor, spec: ShellExecSpec, next: () => Promise<ShellExecSpec>): Promise<ShellExecSpec>',
-    summary: 'Bind a resolved tool invocation to its final native launch.',
-    description: 'Bind a resolved tool invocation to its final native launch.',
-    parameters: [{ name: 'actor', description: 'the same-process tool execution.' }, { name: 'provider', description: 'the captured executor that will receive the spec.' }, { name: 'spec', description: 'complete execution inputs before launch.' }, { name: 'next', description: 'remaining authorization listeners.' }],
   },
   {
     name: 'skills/change',
@@ -3861,10 +3803,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ApiSessionAgentResult = {\n    readonly agent: Agent;\n} | {\n    readonly error: ApiSessionAgentError;\n};',
   },
   {
-    name: 'ApprovalExecution',
-    declaration: 'export interface ApprovalExecution {\n    readonly token: symbol;\n    readonly parameters: unknown;\n    readonly provider: object;\n    readonly workdir: string;\n    readonly requestedMode: string;\n}',
-  },
-  {
     name: 'ApprovalOutcome',
     declaration: 'export type ApprovalOutcome = \'allowed-once\' | \'rejected\' | \'cancelled\' | \'unavailable\';',
   },
@@ -3874,15 +3812,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ApprovalRequest',
-    declaration: 'export interface ApprovalRequest extends ApprovalRequestEvent {\n    readonly execution?: ApprovalExecution;\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: ToolCallId;\n    readonly reason?: string;\n    readonly signal?: AbortSignal;\n}',
+    declaration: 'export interface ApprovalRequest extends ApprovalRequestEvent {\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: ToolCallId;\n    readonly reason?: string;\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'ApprovalRequestEvent',
-    declaration: 'export interface ApprovalRequestEvent {\n    readonly id?: ApprovalRequestId;\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: ToolCallId;\n    readonly reason?: string;\n    readonly review?: ApprovalReview;\n    readonly signal?: AbortSignal;\n}',
-  },
-  {
-    name: 'ApprovalReview',
-    declaration: 'export interface ApprovalReview {\n    readonly recommendation: \'execute\';\n    readonly purpose: string;\n    readonly authorization: string;\n    readonly scope: string;\n    readonly consequences: string;\n}',
+    declaration: 'export interface ApprovalRequestEvent {\n    readonly id?: ApprovalRequestId;\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId?: ToolCallId;\n    readonly reason?: string;\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'AskUserQuestionAnswer',
@@ -4399,10 +4333,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    tools?: ToolSchema[];\n}',
-  },
-  {
-    name: 'ExecutionApprovalRequest',
-    declaration: 'export interface ExecutionApprovalRequest {\n    readonly agent: Agent;\n    readonly toolName: string;\n    readonly callId: ToolCallId;\n    readonly execution: ApprovalExecution;\n}',
   },
   {
     name: 'FeedbackCategory',
@@ -5269,10 +5199,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SearchPathsResultView {\n    card: \'search\';\n    shape: \'paths\';\n    title?: string;\n    paths: string[];\n    truncated: boolean;\n    total: number;\n}',
   },
   {
-    name: 'SearchPlan',
-    declaration: 'export interface SearchPlan {\n    readonly batches: readonly {\n        argv: readonly string[];\n        stdin?: string;\n    }[];\n    readonly project: (stdout: string) => string;\n    readonly beforeSpawn: () => void;\n    readonly validate: () => void;\n}',
-  },
-  {
     name: 'SearchResultView',
     declaration: 'export type SearchResultView = SearchMatchesResultView | SearchPathsResultView;',
   },
@@ -5838,11 +5764,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ShellExecSpec',
-    declaration: 'export interface ShellExecSpec {\n    beforeSpawn?: (spec: ShellExecSpec, provider: object) => void;\n    command: string;\n    workdir: string;\n    timeoutMs: number;\n    stdoutMaxBytes: number;\n    signal?: AbortSignal | undefined;\n    stdin?: string | undefined;\n    env?: Record<string, string> | undefined;\n    dshEnv?: DshEnvironment | undefined;\n    sandboxPolicy: SandboxExecutionPolicy | undefined;\n}',
-  },
-  {
-    name: 'ShellExecutor',
-    declaration: 'export abstract class ShellExecutor extends Service {\n    constructor(ctx: Context);\n    get sandboxMode(): SandboxMode | undefined;\n    get launchGuardVersion(): number;\n    executionIdentity(_spec: ShellExecSpec): string;\n    abstract resolve(request: ShellExecRequest): ShellExecSpec;\n    preflight(_spec: ShellExecSpec): Promise<{\n        mode: string;\n        enforcement: string;\n    }>;\n    abstract run(spec: ShellExecSpec): Promise<ShellRunResult>;\n    abstract start(spec: ShellExecSpec): Promise<ShellProcess>;\n}',
+    declaration: 'export interface ShellExecSpec {\n    command: string;\n    workdir: string;\n    timeoutMs: number;\n    stdoutMaxBytes: number;\n    signal?: AbortSignal | undefined;\n    stdin?: string | undefined;\n    env?: Record<string, string> | undefined;\n    dshEnv?: DshEnvironment | undefined;\n    sandboxPolicy: SandboxExecutionPolicy | undefined;\n}',
   },
   {
     name: 'ShellProcess',

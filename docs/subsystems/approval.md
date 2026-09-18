@@ -58,8 +58,6 @@ Both policies contribute their complete current meaning to the cache-safe runtim
  * presented tool call, so arguments are not duplicated here.
  */
 interface ApprovalRequest extends ApprovalRequestEvent {
-  /** Optional executor identity used to consume a prior Auto grant before asking. */
-  readonly execution?: ApprovalExecution
   /**
    * The agent on whose behalf the question is asked. Routes the question (a
    * UI answerer only answers for agents it owns) and receives the audit
@@ -92,38 +90,13 @@ The audit events are log-only and do not enter the model transcript. Model-visib
 ### `ApprovalReview`
 
 ```ts type-equiv
-/** Complete model explanation attached only to Auto's suggested execution. */
+/** Retired review explanation retained only in existing approval audit records. */
 interface ApprovalReview {
   readonly recommendation: 'execute'
   readonly purpose: string
   readonly authorization: string
   readonly scope: string
   readonly consequences: string
-}
-```
-
-### `ApprovalExecution`
-
-```ts type-equiv
-/** Same-process execution identity; never transmitted to an answerer or persisted. */
-interface ApprovalExecution {
-  readonly token: symbol
-  readonly parameters: unknown
-  readonly provider: object
-  readonly workdir: string
-  readonly requestedMode: string
-}
-```
-
-### `ExecutionApprovalRequest`
-
-```ts type-equiv
-/** The executor asks whether an existing per-call authorization covers its exact request. */
-interface ExecutionApprovalRequest {
-  readonly agent: Agent
-  readonly toolName: string
-  readonly callId: ToolCallId
-  readonly execution: ApprovalExecution
 }
 ```
 
@@ -142,8 +115,6 @@ interface ApprovalRequestEvent {
   readonly callId?: ToolCallId
   /** Human-readable reason supplied by the asker. */
   readonly reason?: string
-  /** Model execution recommendation, only supplied by Auto. */
-  readonly review?: ApprovalReview
   /** Cancellation lifetime of the pending request. */
   readonly signal?: AbortSignal
 }
@@ -152,7 +123,7 @@ interface ApprovalRequestEvent {
 ### `ReviewExecutionFacts`
 
 ```ts type-equiv
-/** Durable facts supplied to a model reviewer, never human authorization. */
+/** Retired reviewer facts retained for reading existing session logs; never execution authority. */
 interface ReviewExecutionFacts {
   readonly file?: {
     readonly path: string
@@ -174,7 +145,7 @@ interface ReviewExecutionFacts {
 }
 ```
 
-Auto may attach a structured execution recommendation. The same-process execution identity is consumed before another question is published and never enters the Client request or durable audit. A human answer covers only the frozen call; callers retain final parameter, provider and file checks. The additional review-input and file-commit events record inspected facts, not replayable permission.
+The legacy `approval/review-input`, `approval/file-commit`, `approval/file-origin` records and optional `approval/asked.review` remain readable. New requests carry the native tool identity, reason and cancellation signal; historical review facts cannot approve another call. Host-issued request IDs also support desktop notification navigation.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -202,9 +173,8 @@ setPolicy(agent: Agent, policy: ApprovalPolicy): void
 
 /**
  * Ask the composed answerers to decide one readonly same-process request.
- * The service borrows the agent, session, and live signal and adds an audit id
- * to the dispatched request. A matching execution grant is consumed before
- * creating another pending request or notification.
+ * The service borrows the agent, session, and live signal and adds the audit
+ * id to the dispatched request so answerers and notifications share its identity.
  * The request requires an open turn because the audit pair must be enclosed
  * by the durable log's commit/replay boundary; an idle ask rejects before
  * appending anything. The answerer phase always produces an outcome: an
@@ -237,24 +207,6 @@ Source: [`packages/interaction/user-approval/src/index.ts`](../../packages/inter
 <a id="approval-events"></a>
 
 ### `approval/*` events
-
-<a id="approvalconsume-execution--waterfall"></a>
-
-#### `approval/consume-execution` — waterfall
-
-Consume an exact execution grant before creating a second approval question. Undefined delegates to normal approval; every other outcome is final.
-
-```ts cordis-catalog
-/**
- * Consume an exact execution grant before creating a second approval question.
- * Undefined delegates to normal approval; every other outcome is final.
- * @param req - same-process execution identity supplied by the executor.
- * @mode waterfall
- */
-'approval/consume-execution'(req: ExecutionApprovalRequest, next: () => Promise<ApprovalOutcome | undefined>): Promise<ApprovalOutcome | undefined>
-```
-
-Source: [`packages/interaction/user-approval/src/types.ts`](../../packages/interaction/user-approval/src/types.ts)
 
 <a id="approvalrequest--waterfall"></a>
 

@@ -7,7 +7,7 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ApprovalService, { ApprovalOutcome, ApprovalRequest, setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
+import ApprovalService, { ApprovalOutcome, ApprovalRequest, ApprovalRequestId, setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
 
 /**
  * A minimal Agent stand-in — the service only reaches `agent.session.append`
@@ -44,6 +44,42 @@ function requestOf(agent: Agent, overrides: Partial<ApprovalRequest> = {}): Appr
 }
 
 describe('ApprovalService.request', () => {
+  it('reads retired review records without using their grants for a new request', async () => {
+    const original = Session.create(SessionId('retired-review-original'))
+    const callId = ToolCallId('retired-call')
+    const id = ApprovalRequestId('retired-request')
+    original.append('turn/start', { turn: 1 })
+    original.append('approval/review-input', { callId, facts: { file: {
+      path: 'fixture.txt', exists: false, withinWorkspace: true, recordedVersion: false, createdBySession: false,
+    } } })
+    original.append('approval/call-authorized', {
+      callId, toolName: 'write', fingerprint: 'historical-only', approvedBy: 'human',
+      workdir: '/fixture', mode: 'workspace-write', provider: 'retired-provider',
+    })
+    original.append('approval/file-committed', { callId, path: 'fixture.txt', identityHash: 'historical-file', source: 'created' })
+    original.append('approval/asked', { id, toolName: 'write', callId, review: {
+      recommendation: 'execute', purpose: 'Historical operation', authorization: 'Historical task',
+      scope: 'fixture.txt', consequences: 'The new file was written.',
+    } })
+    original.append('approval/decided', { id, outcome: 'allowed-once' })
+    original.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const saved = original.snapshotEvents()
+    const resumed = Session.create(SessionId('retired-review-resumed'), saved)
+    expect(resumed.snapshotEvents().slice(0, saved.length)).toEqual(saved)
+    expect(resumed.deriveMessages()).toEqual([])
+
+    const ctx = await mounted()
+    try {
+      resumed.append('turn/start', { turn: 2 })
+      await expect(ctx.approval.request({ agent: { session: resumed } as Agent, toolName: 'write', callId }))
+        .resolves.toBe('unavailable')
+      const asked = resumed.snapshotEvents().filter(event => event.type === 'approval/asked')
+      expect(asked).toHaveLength(2)
+      expect(asked[1]?.data).not.toHaveProperty('review')
+      expect(asked[1]?.data.id).not.toBe(id)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('throws before appending anything when no turn has ever opened (idle ask)', async () => {
     const ctx = await mounted()
     const { agent, appended } = fakeAgent([])

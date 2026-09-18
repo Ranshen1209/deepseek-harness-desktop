@@ -11,9 +11,9 @@ export function installApprovalNotices(ctx: Context, write: (frame: Buffer) => P
   }
   ctx.on('approval/request', async (request, next) => {
     if (request.id === undefined || request.signal?.aborted) return next()
-    const identity = { requestId: String(request.id), sessionId: String(request.agent.session.header.id),
-      category: (['pwsh', 'bash'].includes(request.toolName) ? 'command'
-        : ['read', 'write', 'edit', 'managed_file', 'str_replace_editor'].includes(request.toolName) ? 'file' : 'tool') as DesktopApprovalNotice['category'] }
+    const identity: Omit<DesktopApprovalNotice, 'state'> = { requestId: String(request.id), sessionId: String(request.agent.session.header.id),
+      category: ['pwsh', 'bash'].includes(request.toolName) ? 'command'
+        : ['read', 'write', 'edit', 'str_replace_editor'].includes(request.toolName) ? 'file' : 'tool' }
     let ended = false
     const end = (): void => {
       if (ended) return

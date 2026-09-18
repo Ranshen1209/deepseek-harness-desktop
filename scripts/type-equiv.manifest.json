@@ -2169,16 +2169,6 @@
     },
     {
       "doc": "docs/subsystems/approval.md",
-      "symbol": "ApprovalExecution",
-      "source": "packages/interaction/user-approval/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/approval.md",
-      "symbol": "ExecutionApprovalRequest",
-      "source": "packages/interaction/user-approval/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/approval.md",
       "symbol": "ApprovalRequestEvent",
       "source": "packages/interaction/user-approval/src/types.ts"
     },
@@ -2186,11 +2176,6 @@
       "doc": "docs/subsystems/approval.md",
       "symbol": "ReviewExecutionFacts",
       "source": "packages/interaction/user-approval/src/types.ts"
-    },
-    {
-      "doc": "docs/subsystems/filesystem.md",
-      "symbol": "SearchPlan",
-      "source": "packages/fs/tool-fs-search/src/search-core.ts"
     }
   ]
 }

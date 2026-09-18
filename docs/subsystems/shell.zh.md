@@ -72,8 +72,6 @@ interface ShellExecRequest {
  * background processes have no executor timeout.
  */
 interface ShellExecSpec {
-  /** Same-process one-shot authorization, checked synchronously after preparation and immediately before spawn. */
-  beforeSpawn?: (spec: ShellExecSpec, provider: object) => void
   command: string
   workdir: string
   timeoutMs: number
@@ -225,7 +223,6 @@ interface ShellProcessRead {
 
 `ShellExecutor` 拥有 `resolve`、前台 `run`、后台进程 `start` 以及 `sandboxMode` 能力事实。`dsh-bash-local` 拥有命令默认值补全、超时/中止分类、终端环境以及后台读取合并；managed-range 终止、有界收集器、spill 文件、凭据清除与 dispose（资源释放）后完全停稳归[子进程服务](subprocess.zh.md)所有。`dsh-tool-bash` 拥有面向模型的渲染，并将后台句柄适配到[通用任务运行时](jobs.zh.md)。`dsh-shell` 拥有 shell 工具共享的退出状态约定：导出的 `parseExitStatus`/`ParsedExitStatus` 是 `dsh-tool-bash` 的 `renderResult` 与 `dsh-tool-pwsh` 的 `renderPwshResult` 所追加的 `[exit code: N]` / `[killed by signal: X]` 标记的逆解析，两个工具的 `presentResult` 都用它把渲染文本拆分为 terminal 卡的输出正文与退出状态 pill。
 
-提供者将预检和执行身份与启动分开。支持 launchGuardVersion 1 的提供者在异步隔离准备后、唯一启动前同步调用 beforeSpawn。Auto 捕获该提供者和完整解析输入。预检失败会停止执行；预检成功仅报告后端的实际保护能力，不代表 Windows 完整隔离。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -250,27 +247,12 @@ Implementations must honor these semantics:
 
 ```ts cordis-catalog
 /**
- * Capture executable selection and cleaned process inputs for exact-call approval.
- * @param _spec - resolved execution inputs.
- * @returns an opaque comparison value; callers must not log it or send it to a model.
- */
-executionIdentity(_spec: ShellExecSpec): string
-
-/**
  * Apply implementation-owned defaults and caps to a request before execution.
  * @param request - the caller's request; omitted fields get this
  *   implementation's defaults, capped fields are clamped.
  * @returns the fully-specified spec to hand to {@link run}/{@link start}.
  */
 abstract resolve(request: ShellExecRequest): ShellExecSpec
-
-/**
- * Check execution infrastructure without launching the requested command.
- * @param _spec - resolved command and requested sandbox policy.
- * @returns actual confinement facts available for approval.
- * @throws when this provider has no supported preflight or setup fails.
- */
-preflight(_spec: ShellExecSpec): Promise<{ mode: string; enforcement: string }>
 
 /**
  * Run preparation and the foreground command under the resolved timeout.
@@ -323,28 +305,4 @@ list(): BashEnvVariableInfo[]
 Types: [DshEnvironment](subprocess.zh.md) · [ToolExecution](tools.zh.md)
 
 Source: [`packages/shell/shell-env/src/index.ts`](../../packages/shell/shell-env/src/index.ts)
-
-<a id="shell-events"></a>
-
-### `shell/*` events
-
-<a id="shellauthorize--waterfall"></a>
-
-#### `shell/authorize` — waterfall
-
-Bind a resolved tool invocation to its final native launch.
-
-```ts cordis-catalog
-/**
- * Bind a resolved tool invocation to its final native launch.
- * @param actor - the same-process tool execution.
- * @param provider - the captured executor that will receive the spec.
- * @param spec - complete execution inputs before launch.
- * @param next - remaining authorization listeners.
- * @mode waterfall
- */
-'shell/authorize'(actor: object, provider: ShellExecutor, spec: ShellExecSpec, next: () => Promise<ShellExecSpec>): Promise<ShellExecSpec>
-```
-
-Source: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)
 <!-- END GENERATED cordis-surface -->

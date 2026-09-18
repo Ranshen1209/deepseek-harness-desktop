@@ -14348,7 +14348,7 @@
         "packages/interaction/user-approval/src/index.ts#ApprovalPolicy"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/index.ts:61"
+        "packages/interaction/user-approval/src/index.ts:60"
       ]
     },
     {
@@ -18101,7 +18101,7 @@
         "event:approval/policy.data"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/index.ts:34"
+        "packages/interaction/user-approval/src/index.ts:33"
       ]
     },
     {
@@ -34800,7 +34800,7 @@
         "event:approval/asked.data"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/types.ts:102"
+        "packages/interaction/user-approval/src/types.ts:85"
       ]
     },
     {
@@ -45447,7 +45447,7 @@
         "event:approval/decided.data"
       ],
       "sources": [
-        "packages/interaction/user-approval/src/types.ts:114"
+        "packages/interaction/user-approval/src/types.ts:98"
       ]
     },
     {

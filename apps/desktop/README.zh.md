@@ -22,7 +22,7 @@
 <a id="permissions-and-auto"></a>
 ## 权限与 Auto
 
-桌面在仅可查看、工作区内修改和完全权限之外，启用官方实验性 [Auto review](../../packages/experimental/auto-review/README.zh.md)。新会话默认使用工作区内修改；选择 Auto 时使用官方当前会话风险确认。未来会话默认值不提供 Auto。已停用的 `@nanmicoder/dsh-auto-mode` 不再激活，也不包含在应用依赖树中。
+桌面在仅可查看、工作区内修改和完全权限之外，启用官方实验性 [Auto review](../../packages/experimental/auto-review/README.zh.md)。新会话默认使用工作区内修改；选择 Auto 时使用官方当前会话风险确认。未来会话默认值不提供 Auto。已停用的自研 Auto 实现已从源码、工作区成员、构建命令和应用依赖树中删除，仅保留历史会话记录读取和明确的权限重选。
 
 官方审核器使用当前 Agent 的 provider/model 和适配器默认思考设置。批准的调用以完全访问权限执行，不再要求后续人工批准；拒绝或审核失败则停止。官方响应协议保持原样，包括不允许 allow 响应带 reason 的规则。桌面不再增加强制 max、自定义文件工具、恢复区、工具白名单或第二轮审批。完全访问仍受操作系统权限限制，不会授予管理员权限。Auto 本身不提供文件沙箱或删除恢复，模型可能判断错误。完整行为和限制由官方插件文档定义。
 

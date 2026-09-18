@@ -27,9 +27,10 @@ jobs:
           node-version: 24.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts
+      - run: pnpm exec vitest run apps/desktop/tests/menu.spec.ts apps/desktop/tests/locale.spec.ts apps/desktop/tests/protection.spec.ts packages/experimental/auto-review/tests/auto-review.spec.ts
       - run: pnpm run generate:desktop-icons
       - run: pnpm run package:desktop:win:x64
+      - run: pnpm exec tsx apps/desktop/scripts/verify-packaged-runtime.ts win-x64
       - run: node .github/verify-desktop-version.mjs win-x64
       - uses: actions/upload-artifact@v4
         with:

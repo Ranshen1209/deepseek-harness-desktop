@@ -81,8 +81,6 @@ Failures are normalized as `Error: <message>` with a structured code preserved f
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Reads can consume verified bytes supplied for the exact call; writes resolve the call-specific execution policy before conditional commit. Without those listeners, native permission and observation behavior is unchanged.
-
 This section explains the design decisions behind the tool suite and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
 
 ### Design concept

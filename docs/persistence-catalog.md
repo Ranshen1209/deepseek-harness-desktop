@@ -220,20 +220,21 @@ Source: [`packages/preset/agent-presets/src/session.ts:28`](../packages/preset/a
   toolName: string
   callId?: ToolCallId
   reason?: string
+  /** Retired review explanation preserved when an existing log is read. */
   review?: ApprovalReview
 }
 ```
 
 Types: [ToolCallId](subsystems/core.md)
 
-Source: [`packages/interaction/user-approval/src/types.ts:102`](../packages/interaction/user-approval/src/types.ts)
+Source: [`packages/interaction/user-approval/src/types.ts:85`](../packages/interaction/user-approval/src/types.ts)
 
 <a id="approvalcall-authorized--log-only"></a>
 
 #### `approval/call-authorized` — log-only
 
 ```ts persistence-catalog
-/** One execution grant; reload never turns this audit record into a reusable permission. */
+/** Historical execution audit; reading it never grants permission to execute. */
 'approval/call-authorized': { callId: ToolCallId; toolName: string; fingerprint: string; approvedBy: 'model' | 'human'; workdir: string; mode: string; provider: string }
 ```
 
@@ -257,14 +258,14 @@ Source: [`packages/interaction/user-approval/src/types.ts:60`](../packages/inter
 }
 ```
 
-Source: [`packages/interaction/user-approval/src/types.ts:114`](../packages/interaction/user-approval/src/types.ts)
+Source: [`packages/interaction/user-approval/src/types.ts:98`](../packages/interaction/user-approval/src/types.ts)
 
 <a id="approvalfile-committed--log-only"></a>
 
 #### `approval/file-committed` — log-only
 
 ```ts persistence-catalog
-/** Successfully committed structured file version; separate from task authorization. */
+/** Historical structured file-version audit; reading it never authorizes another mutation. */
 'approval/file-committed': { callId: ToolCallId; path: string; identityHash: string; source: 'created' | 'modified' }
 ```
 
@@ -292,14 +293,14 @@ Source: [`packages/interaction/user-approval/src/types.ts:62`](../packages/inter
 }
 ```
 
-Source: [`packages/interaction/user-approval/src/index.ts:34`](../packages/interaction/user-approval/src/index.ts)
+Source: [`packages/interaction/user-approval/src/index.ts:33`](../packages/interaction/user-approval/src/index.ts)
 
 <a id="approvalreview-input--log-only"></a>
 
 #### `approval/review-input` — log-only
 
 ```ts persistence-catalog
-/** Exact inspected facts sent to the reviewer; history and pending call are already logged. */
+/** Historical inspected facts from the retired reviewer; retained for session-log compatibility. */
 'approval/review-input': { callId: ToolCallId; facts: ReviewExecutionFacts }
 ```
 
@@ -2064,7 +2065,7 @@ SHA-256: `52fbb9f07133a77fb34335956bfa727a205466865eef8dbe8b1541b35021936b`
 
 SHA-256: `5299752d557c6bad8754cd697576a769d66802e9965016f23bd5c90906aa2d52`
 
-Sources: [`packages/interaction/user-approval/src/types.ts:102`](../packages/interaction/user-approval/src/types.ts)
+Sources: [`packages/interaction/user-approval/src/types.ts:85`](../packages/interaction/user-approval/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2137,7 +2138,7 @@ SHA-256: `bb1ab3d08f49a9f3b265f844cd78d5c49813062a7b34b54904b426f85d0ff6e3`
 
 SHA-256: `93cbbc5a7fd0b1aa1ff1b9a6bb5ec52b073f48e5a5200365c45c0cd54059e1b9`
 
-Sources: [`packages/interaction/user-approval/src/types.ts:114`](../packages/interaction/user-approval/src/types.ts)
+Sources: [`packages/interaction/user-approval/src/types.ts:98`](../packages/interaction/user-approval/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -2204,7 +2205,7 @@ SHA-256: `26718e15e7e395bce9642dba5bbe09b3b1a4ce2213d20d566cd9207d7fc5fb78`
 
 SHA-256: `11f70b595aa76897fc4e25a352bfa718c659f44b799e5aa14e84e5a38fe72912`
 
-Sources: [`packages/interaction/user-approval/src/index.ts:34`](../packages/interaction/user-approval/src/index.ts)
+Sources: [`packages/interaction/user-approval/src/index.ts:33`](../packages/interaction/user-approval/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -5253,7 +5254,7 @@ One of:
 
 SHA-256: `05d2ae1e0c7f8770f83f9a09047afb39a335d8ac986df3193659aa1e581472cf`
 
-Sources: [`packages/interaction/user-approval/src/index.ts:61`](../packages/interaction/user-approval/src/index.ts)
+Sources: [`packages/interaction/user-approval/src/index.ts:60`](../packages/interaction/user-approval/src/index.ts)
 
 One of:
 

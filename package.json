@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-root",
-  "version": "0.1.6-alpha.1.desktop.3.local.7",
+  "version": "0.1.6-alpha.1.desktop.4",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -192,8 +192,7 @@
     "demo:inspector": "node --import tsx/esm apps/cli/src/bin.ts web --patch ./packages/experimental/inspector/cordis.source.patch.yml",
     "mock:llm": "node --import tsx packages/test-support/llm-mock-server/src/bin.ts",
     "dev:web": "tsx scripts/dev-web.ts --poll",
-    "postinstall": "node scripts/install-lefthook.mjs",
-    "build:desktop-auto-mode": "pnpm --dir integrations/auto-mode run build"
+    "postinstall": "node scripts/install-lefthook.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "workspace:^",

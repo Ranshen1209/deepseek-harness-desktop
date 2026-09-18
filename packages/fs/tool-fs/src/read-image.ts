@@ -262,9 +262,7 @@ export function applyReadImageTool(ctx: Context): void {
       // The tool result is one message carrying one image, so the per-message
       // aggregate bound applies beside the per-image bound.
       const byteCap = Math.min(attachments.imageLimits.maxImageBytes, attachments.imageLimits.maxMessageImageBytes)
-      const snapshot = await ctx.waterfall('fs/read-snapshot', exec, target, () => Promise.resolve(undefined))
-      const data = snapshot ?? await ctx.fs.readBytes(target, exec.signal, byteCap)
-      if (data.byteLength > byteCap) throw new Error('Image exceeds the read byte limit')
+      const data = await ctx.fs.readBytes(target, exec.signal, byteCap)
       const mediaType = declared ?? sniffImageMediaType(data)
       if (mediaType === undefined) {
         throw new Error(`cannot read "${target.displayPath}": the file content is not a supported image format; read_image accepts PNG/JPEG/WebP/GIF`)

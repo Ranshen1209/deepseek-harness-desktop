@@ -281,7 +281,7 @@ export function applyGrepTool(ctx: Context, caps: GrepToolCaps): void {
         + (ctx.tools.get('read', scope) === undefined ? '' : ' Use read on a matched file when you need surrounding context.'),
   })
 
-  const tool = Object.assign(defineTool({
+  const tool = defineTool({
     name: 'grep',
     description: 'Search file contents with a ripgrep regular expression. Returns matching lines with line numbers, grouped by file. '
       + `Returns the first ${caps.maxMatches} matches inline; a capped result reports where the complete match list was saved. `
@@ -337,7 +337,7 @@ export function applyGrepTool(ctx: Context, caps: GrepToolCaps): void {
     },
     presentCall: presentGrepCall,
     presentResult: presentGrepResult,
-  }), { fileSearchAccessVersion: 1 as const })
+  })
   ctx.tools.register(tool)
 
   ctx.on('tools/post-execute', async (exec, result, next) => {

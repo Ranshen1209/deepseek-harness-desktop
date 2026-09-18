@@ -88,7 +88,7 @@ export class FsSandboxController {
     validateEscalationArgs(args.sandbox_permissions, args.justification)
     const standingPolicy = this.policy?.resolve({ ...exec.agent ? { session: exec.agent.session } : {} })
     if (args.sandbox_permissions === undefined || args.justification === undefined) {
-      return this.ctx.waterfall('fs/execution-policy', exec, standingPolicy, () => Promise.resolve(standingPolicy))
+      return standingPolicy
     }
     if (this.escalationModes.length === 0) {
       throw new Error('sandbox_permissions is not available in this composition (no sandboxing filesystem to escalate)')
@@ -102,8 +102,6 @@ export class FsSandboxController {
         callId: exec.callId,
         toolName,
         signal: exec.signal,
-        execution: { token: exec.token, parameters: exec.arguments, provider: this.ctx.fs,
-          workdir: exec.agent?.session.header.cwd ?? process.cwd(), requestedMode: args.sandbox_permissions },
       },
     )
     return { ...policy, mode: approvedMode }

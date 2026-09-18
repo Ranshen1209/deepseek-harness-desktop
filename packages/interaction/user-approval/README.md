@@ -63,7 +63,7 @@ The model sees only the asking consumer's eventual tool outcome — allowed, rej
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-A request may carry an Auto execution recommendation and explanation. The service adds the durable request ID before dispatch. A matching single-call execution grant is consumed before another request is published; no new asked event or notification is produced for that covered escalation.
+Answerers and desktop notifications receive the audit request ID. Historical review explanations and file-operation records remain readable, but cannot approve a new request. The service neither emits these retired records nor accepts execution grants from them.
 
 The observable behavior is covered in [Use this package](#use-this-package); this section explains dispatch, policy enforcement, and the audit path.
 

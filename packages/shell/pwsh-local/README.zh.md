@@ -81,8 +81,6 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 <details>
 <summary>实现细节——点击展开</summary>
 
-执行器不加载 PowerShell Profile，在隔离准备后检查传入的最终启动授权。进程身份包含解析后的 argv 与环境，变化会在启动前使 Auto 批准失效。
-
 本节解释执行器的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
 ### 设计概念

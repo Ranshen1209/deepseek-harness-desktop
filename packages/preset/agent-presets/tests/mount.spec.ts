@@ -129,14 +129,12 @@ describe('composing an agent from a preset', () => {
       expect(toolNames(scoped, second)).toEqual(['glob', 'grep'])
       expect(toolNames(scoped)).toEqual([])
       for (const name of ['glob', 'grep']) {
-        expect(scoped.tools.get(name, first)?.fileSearchAccessVersion).toBe(1)
+        expect(scoped.tools.get(name, first)).toBeDefined()
         expect(scoped.tools.get(name, first)).toBe(scoped.tools.get(name, second))
       }
-      for (const schema of scoped.tools.schemas(first)) expect(schema).not.toHaveProperty('fileSearchAccessVersion')
       const mount = livePresetMounts().find(entry => entry.presetId === 'search')
       expect(mount).toBeDefined()
       expect(leakedServices(scoped, mount!.fiber)).toEqual([])
-      expect(providedServiceNames(scoped)).not.toContain('fileSearchAccessVersion')
     } finally {
       await scoped.fiber.dispose()
     }

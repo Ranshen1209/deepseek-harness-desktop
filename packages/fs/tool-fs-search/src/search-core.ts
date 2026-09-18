@@ -29,33 +29,6 @@ import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, Subproc
 import type { SaveTextSpill, SpillRef } from '@deepseek-ai/dsh-spill'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 
-/** Fixed native search arguments and final file-identity validation. */
-export interface SearchPlan {
-  readonly batches: readonly { argv: readonly string[]; stdin?: string }[]
-  readonly project: (stdout: string) => string
-  readonly beforeSpawn: () => void
-  readonly validate: () => void
-}
-
-declare module '@deepseek-ai/dsh-tools' {
-  interface ToolDefinition {
-    /** This tool calls fs-search/plan before spawning and validates its protected result. */
-    readonly fileSearchAccessVersion?: 1
-  }
-}
-
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    /**
-     * Restrict a native search to inspected files before spawning ripgrep.
-     * @param exec - reviewed tool execution.
-     * @param argv - native fixed argument template, including model patterns as data.
-     * @mode waterfall
-     */
-    'fs-search/plan'(exec: ToolExecution, argv: readonly string[], next: () => Promise<SearchPlan | undefined>): Promise<SearchPlan | undefined>
-  }
-}
-
 /**
  * Default cap on the complete raw `rg` stdout the tools will parse (the
  * `rawOutputMaxBytes` config), matching Claude Code's ripgrep raw buffer.
@@ -255,29 +228,6 @@ export async function runRipgrep(
   graceMs: number,
   stderrMaxBytes: number,
 ): Promise<RipgrepRun> {
-  const plan = await ctx.waterfall('fs-search/plan', exec, argv, () => Promise.resolve(undefined))
-  if (plan === undefined) return runRipgrepBatch(ctx, exec, toolName, argv, rawOutputMaxBytes, graceMs, stderrMaxBytes)
-  let stdout = ''
-  let remaining = rawOutputMaxBytes
-  const workdir = exec.agent?.session.header.cwd ?? process.cwd()
-  plan.validate()
-  for (const batch of plan.batches) {
-    const run = await runRipgrepBatch(ctx, exec, toolName, batch.argv, remaining, graceMs, stderrMaxBytes, batch.stdin, plan.beforeSpawn)
-    stdout += run.stdout
-    remaining -= Buffer.byteLength(run.stdout)
-    if (remaining <= 0) throw new SearchError('Search results exceed the complete output limit; narrow the path', 'SEARCH_RAW_OUTPUT_OVERFLOW')
-  }
-  plan.validate()
-  stdout = plan.project(stdout)
-  if (Buffer.byteLength(stdout) > rawOutputMaxBytes) throw new SearchError('Search results exceed the complete output limit; narrow the path', 'SEARCH_RAW_OUTPUT_OVERFLOW')
-  return { stdout, noMatches: stdout.length === 0, workdir }
-}
-
-/** Run one bounded argv batch; callers validate protected search files before release. */
-async function runRipgrepBatch(
-  ctx: Context, exec: ToolExecution, toolName: string, argv: readonly string[],
-  rawOutputMaxBytes: number, graceMs: number, stderrMaxBytes: number, stdin?: string, beforeSpawn?: () => void,
-): Promise<RipgrepRun> {
   if (exec.signal.aborted) {
     throw new SearchError(`${toolName} was aborted before completion (tool timeout or caller cancellation)`, 'SEARCH_ABORTED')
   }
@@ -285,13 +235,11 @@ async function runRipgrepBatch(
   const workdir = cwd ?? process.cwd()
   let handle: SubprocessHandle
   try {
-    const program = await resolveRgPath()
-    beforeSpawn?.()
     handle = ctx.subprocess.spawn({
-      argv: [program, '--no-config', ...argv],
+      argv: [await resolveRgPath(), '--no-config', ...argv],
       cwd: workdir,
       stdio: {
-        stdin: stdin === undefined ? 'ignore' : { data: stdin },
+        stdin: 'ignore',
         stdout: { maxBytes: rawOutputMaxBytes },
         stderr: { maxBytes: stderrMaxBytes },
       },

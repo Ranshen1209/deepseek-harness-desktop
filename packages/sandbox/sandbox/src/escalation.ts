@@ -105,23 +105,7 @@ export interface EscalationApprover<A = object, C = string> {
    * @param req - the audit-self-contained request (agent, tool, call id, reason, optional signal).
    * @returns the human's decision as a closed {@link EscalationOutcome}.
    */
-  request(req: {
-    agent: A
-    toolName: string
-    callId: C
-    reason: string
-    signal?: AbortSignal
-    execution?: EscalationExecution
-  }): Promise<EscalationOutcome>
-}
-
-/** Executor-owned facts bound to a single pending tool call. */
-export interface EscalationExecution {
-  readonly token: symbol
-  readonly parameters: unknown
-  readonly provider: object
-  readonly workdir: string
-  readonly requestedMode: string
+  request(req: { agent: A; toolName: string; callId: C; reason: string; signal?: AbortSignal }): Promise<EscalationOutcome>
 }
 
 /**
@@ -132,8 +116,6 @@ export interface EscalationExecution {
  * only judges them.
  */
 export interface EscalationApproval<A = object, C = string> {
-  /** Optional exact-execution facts for consuming an existing per-call approval. */
-  execution?: EscalationExecution
   /** The approval requester (`ctx.approval`), or `undefined` when none is composed. */
   approver: EscalationApprover<A, C> | undefined
   /** The calling agent, or `undefined` for an agent-less execution (fails closed). */
@@ -194,7 +176,6 @@ export async function approveEscalation<A, C>(request: EscalationRequest, approv
     callId: approval.callId,
     reason: `escalate sandbox to ${mode}: ${justification}`,
     ...approval.signal ? { signal: approval.signal } : {},
-    ...approval.execution ? { execution: approval.execution } : {},
   })
   switch (outcome) {
     // The schema enum already pinned `mode` to the closed target vocabulary;
