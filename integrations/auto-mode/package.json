@@ -1,8 +1,8 @@
 {
   "name": "@nanmicoder/dsh-auto-mode",
-  "version": "0.3.0-alpha.6",
+  "version": "0.3.0-alpha.7",
   "description": "Preservation-first, fail-closed permission policy for DeepSeek Harness",
-  "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
+  "author": "\u7a0b\u5e8f\u5458\u963f\u6c5f(Relakkes) <relakkes@gmail.com>",
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -135,7 +135,7 @@
   "private": true,
   "sourcePin": {
     "repository": "https://github.com/Ranshen1209/dsh-auto-mode",
-    "commit": "fd3e39ced93dace4694f6ebdf249efb0f5ae6673",
+    "commit": "b405adbb121c271b32e76cf9c8c43a1e08e77ed5",
     "files": {
       "src/artifacts.ts": "0c8383de2dc93e6a8672830db9e9715397148f12b9d9466cf37b9630b0d5de22",
       "src/classifier.ts": "af7306b8943b877763bfcec495daa99d90b1f1934f91b3eead68d2759934964e",
@@ -149,7 +149,7 @@
       "src/index.ts": "189e690227b7bde9649b5cf5876d8f516d47e1b12bd9cafd28a9b2e083636905",
       "src/managed-file.ts": "f03698bfcbf02a74d19b1c4844bf5d25eb33a43dff0fde28e36bea3c56b8e032",
       "src/managed-list.ts": "a8bdfd5baca92c998adbb83cfc4c634eb52cd88b4bfeb045854d4b4e4642d08d",
-      "src/native-execution.ts": "bff9ea429e81f35279f56137b108cd1cc27e5e7a32862ef11377f82ec811a61e",
+      "src/native-execution.ts": "935cbd6581c635c8bb55c95534b3e8d552495d6968b177b4703417f47a007711",
       "src/patch.ts": "2fa9b8d1905ea3ffd2ed52d7420694fd6aea1cb56884ad10e290e5c38133aec1",
       "src/paths.ts": "516e8d7cfc8813db91f0f3839f3bce63f6c0c0d1b1aebe3b12e8f58c68276ef7",
       "src/policy.ts": "e74a52445eded53b515a7902e813af5d1fd084248f9600faeba9b427aa8e2bae",
@@ -157,7 +157,7 @@
       "src/probe-registry.ts": "845b294464e7e94cff5ac52ebe269875d7c8643230af695d0ba0c5f5a5fcb752",
       "src/records.ts": "00b089af51af5b71ea5f7c64b5a40fdced37323ce57b786aff48fa5a703a9487",
       "src/review-audit.ts": "78d34362ca0b946c82855bbb7f542d3b5a89fcf5650064da4fbe12dd6519b5ec",
-      "src/search.ts": "c3b41d3f285e4a01655c7d00a385b55d72754a7ebee9b639bcd84140bcadeafe",
+      "src/search.ts": "85ad9113559c432326af7de15188d6e18353bf37eafd9bfb2ecdb76eebfd3fd1",
       "src/shell.ts": "45e25c2d8e8cac00a60a3db6a62390aee81dfff9f4f2c9c1b6093a47afec63e0",
       "src/types.ts": "32f78a2642c887b5b41131da5cf3db4276bd2b26795474efe5fc8cd368fc0148",
       "src/upstream-review/LICENSE": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be",

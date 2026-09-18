@@ -37,8 +37,14 @@ export interface SearchPlan {
   readonly validate: () => void
 }
 
+declare module '@deepseek-ai/dsh-tools' {
+  interface ToolDefinition {
+    /** This tool calls fs-search/plan before spawning and validates its protected result. */
+    readonly fileSearchAccessVersion?: 1
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
-  interface Context { fileSearchAccessVersion: 1 }
   interface Events {
     /**
      * Restrict a native search to inspected files before spawning ripgrep.

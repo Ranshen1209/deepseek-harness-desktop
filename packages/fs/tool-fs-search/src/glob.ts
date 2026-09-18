@@ -309,7 +309,7 @@ export function applyGlobTool(ctx: Context, caps: GlobToolCaps): void {
   const overCapDescription = caps.sampleOverCapGlobResults
     ? `a larger result instead returns ${caps.maxResults} paths sampled across top-level entries`
     : `a larger result returns the first ${caps.maxResults} paths in modification-time order`
-  const tool = defineTool({
+  const tool = Object.assign(defineTool({
     name: 'glob',
     description: 'Find files whose paths match a glob pattern. Returns matching file paths — never directories — '
       + 'including hidden and ignored files (VCS metadata directories are excluded). '
@@ -356,7 +356,7 @@ export function applyGlobTool(ctx: Context, caps: GlobToolCaps): void {
     },
     presentCall: presentGlobCall,
     presentResult: presentGlobResult,
-  })
+  }), { fileSearchAccessVersion: 1 as const })
   ctx.tools.register(tool)
 
   ctx.on('tools/post-execute', async (exec, result, next) => {

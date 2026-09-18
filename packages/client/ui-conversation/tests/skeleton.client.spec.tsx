@@ -5,6 +5,7 @@ import type { ComponentProps, ReactNode } from 'react'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionListState, SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
+import { SessionCreateError } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceSnapshot, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import {
@@ -112,6 +113,8 @@ function mount(
   workspaceRows: WorkspaceView[] = [{ ...workspace('one'), sessionIds: [SID] }],
   retargetWorkspace = vi.fn(async (_workspaceId: WorkspaceId) => {}),
   options: {
+    /** Render the initial workspace picker before a Session is selected. */
+    noSession?: boolean
     /** When true, mimic overlay:true chain siblings (hidden fallback + takeover). */
     overlayTakeover?: boolean
     /** The session list summary's `blank` flag — independent of the snapshot's. */
@@ -150,7 +153,7 @@ function mount(
       ...listed && options.nestedSubagent === true && { [parent]: parentRow },
       ...listed && { [SID]: childRow },
     },
-    current: SID,
+    current: options.noSession === true ? undefined : SID,
     phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
   })
   const workspaces = createSnapshotStore<WorkspaceSnapshot>(workspaceState(workspaceRows))
@@ -298,17 +301,17 @@ function mount(
   )) as ConversationRootProps['renderSlotChain']
   const props: ConversationRootProps = {
     usePanelInfo: selector => selector({ activePanelId: null }),
-    sessionId: SID,
+    sessionId: options.noSession === true ? undefined : SID,
     SessionProvider: ({ children }) => children,
-    useSession,
-    useConversation,
+    useSession: options.noSession === true ? selector => selector(undefined) : useSession,
+    useConversation: options.noSession === true ? selector => selector(undefined) : useConversation,
     useSessions: bindSnapshotSelector(sessions),
     useSessionPendingInteraction,
     useResource,
     useWorkspaces: bindSnapshotSelector(workspaces),
     useProjection: (() => undefined),
     useComposerBlock: select => select(options.composerBlock),
-    useInput,
+    useInput: options.noSession === true ? selector => selector(undefined) : useInput,
     inputActions,
     renderSlot,
     renderSlotChain,
@@ -582,7 +585,7 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByRole('tab', { name: 'New view' }).getAttribute('aria-selected')).toBe('false')
   })
 
-  it('rolls the pending workspace label back when switching fails', async () => {
+  it('shows the connection failure while retaining the prior workspace and draft', async () => {
     const selectWorkspace = vi.fn(async () => { throw new Error('connect failed') })
     const b = mount(
       sessionSnapshotOf({ blank: true }),
@@ -597,6 +600,40 @@ describe('ConversationRoot resident composer', () => {
     await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
     expect(selectWorkspace).toHaveBeenCalledWith(wid('second'))
     expect(b.view.queryByText('Selected Folder')).toBeNull()
+    expect(b.view.getByText('one')).toBeTruthy()
+    expect(b.view.getByRole('alert').textContent).toContain('connect failed')
+    expect(b.wiring.snapshot.draft).toBe('ordinary draft')
+  })
+
+  it('explains a failed initial workspace connection instead of silently resetting the picker', async () => {
+    const selectWorkspace = vi.fn(async () => {
+      throw new SessionCreateError(new RemoteError('gateway/internal', 'Agent preset could not load', {}), undefined)
+    })
+    const b = mount(sessionSnapshotOf({ blank: true }), [workspace('one')], selectWorkspace, { noSession: true })
+    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+    const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
+    await act(async () => { owner.onPick(wid('one')); await Promise.resolve() })
+    expect(b.view.getByRole('alert').textContent).toContain('Agent preset could not load')
+    expect(b.view.getByRole('alert').textContent).toContain('gateway/internal')
+    expect(b.view.getByRole('textbox').getAttribute('contenteditable')).not.toBe('true')
+  })
+
+  it('does not let an older failed attempt overwrite a retry of the same workspace', async () => {
+    const older = Promise.withResolvers<undefined>()
+    const newer = Promise.withResolvers<undefined>()
+    const selectWorkspace = vi.fn<(_id: WorkspaceId) => Promise<void>>()
+      .mockImplementationOnce(() => older.promise)
+      .mockImplementationOnce(() => newer.promise)
+    const b = mount(sessionSnapshotOf({ blank: true }), [workspace('one')], selectWorkspace, { noSession: true })
+    const pick = () => {
+      fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+      ;(b.pickerOwner() as { onPick(id: WorkspaceId): void }).onPick(wid('one'))
+    }
+    act(pick)
+    act(pick)
+    await act(async () => { newer.resolve(undefined); await newer.promise })
+    await act(async () => { older.reject(new Error('stale failure')); await Promise.resolve() })
+    expect(b.view.queryByRole('alert')).toBeNull()
     expect(b.view.getByText('one')).toBeTruthy()
   })
 

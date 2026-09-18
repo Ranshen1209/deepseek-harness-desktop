@@ -12,6 +12,8 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as FileSearch from '@deepseek-ai/dsh-tool-fs-search'
+import SubprocessRuntime from '@deepseek-ai/dsh-subprocess'
 import AgentRegistry, { assembleContextFor, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -100,6 +102,46 @@ beforeEach(async () => {
 })
 
 describe('composing an agent from a preset', () => {
+  it('mounts the filesystem search tools without publishing a process-global service', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-preset-file-search-'))
+    roots.push(root)
+    const presetDir = join(root, 'search')
+    await mkdir(presetDir)
+    await writeFile(join(presetDir, COMPOSITION_FILE), [
+      '- id: search',
+      '  name: cordis:file-search',
+      '  config:',
+      '    sampleOverCapGlobResults: true',
+      '',
+    ].join('\n'))
+    const scoped = await harness({ default: 'search', roots: [{ path: root, trust: 'user' }], includeShippedRoot: false, includeUserRoot: false })
+    scoped.loader.builtins['file-search'] = FileSearch
+    await scoped.plugin(class extends SubprocessRuntime {
+      resolveExecutable(): never { throw new Error('mounting must not inspect executables') }
+      terminalEnvironment(): never { throw new Error('mounting must not inspect terminals') }
+      spawn(): never { throw new Error('mounting must not launch processes') }
+      spawnTerminal(): never { throw new Error('mounting must not launch terminals') }
+    })
+    try {
+      const first = await agentOn(scoped, 'sess-search-first')
+      const second = await agentOn(scoped, 'sess-search-second')
+      expect(toolNames(scoped, first)).toEqual(['glob', 'grep'])
+      expect(toolNames(scoped, second)).toEqual(['glob', 'grep'])
+      expect(toolNames(scoped)).toEqual([])
+      for (const name of ['glob', 'grep']) {
+        expect(scoped.tools.get(name, first)?.fileSearchAccessVersion).toBe(1)
+        expect(scoped.tools.get(name, first)).toBe(scoped.tools.get(name, second))
+      }
+      for (const schema of scoped.tools.schemas(first)) expect(schema).not.toHaveProperty('fileSearchAccessVersion')
+      const mount = livePresetMounts().find(entry => entry.presetId === 'search')
+      expect(mount).toBeDefined()
+      expect(leakedServices(scoped, mount!.fiber)).toEqual([])
+      expect(providedServiceNames(scoped)).not.toContain('fileSearchAccessVersion')
+    } finally {
+      await scoped.fiber.dispose()
+    }
+  })
+
   it('hands an absolute plugin path to Node as a file URL', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-preset-absolute-plugin-'))
     roots.push(root)

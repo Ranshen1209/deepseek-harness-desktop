@@ -122,7 +122,15 @@ export function ConversationContent({
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
+  const [workspaceFailure, setWorkspaceFailure] = useState<string>()
+  const workspaceAttempt = useRef<symbol | undefined>(undefined)
   const pickerAnchor = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    workspaceAttempt.current = undefined
+    setWorkspaceFailure(undefined)
+    return () => { workspaceAttempt.current = undefined }
+  }, [sessionId])
 
   // Publishes the two live measurements floating View chrome reads off the
   // scroll body: the seat's height as --dsh-composer-height, so controls clear
@@ -198,9 +206,17 @@ export function ConversationContent({
         anchorRef: pickerAnchor,
         selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
         onPick: (workspaceId) => {
+          const attempt = Symbol()
+          workspaceAttempt.current = attempt
           setPickerOpen(false)
+          setWorkspaceFailure(undefined)
           setPendingWorkspaceId(workspaceId)
-          void selectWorkspace(workspaceId).catch(() => {
+          void selectWorkspace(workspaceId).catch((error: unknown) => {
+            if (workspaceAttempt.current !== attempt) return
+            const reason = error instanceof Error ? error.message : t('hero.workspaceFailureUnknown')
+            const code = error instanceof Error && 'code' in error && typeof error.code === 'string'
+              ? ` (${error.code})` : ''
+            setWorkspaceFailure(t('hero.workspaceFailure', { reason: `${reason}${code}` }))
             setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
           })
         },
@@ -241,6 +257,9 @@ export function ConversationContent({
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
       {hero && heroWorkspaceRow}
+      {hero && workspaceFailure !== undefined && (
+        <div className={css.workspaceFailure} role="alert">{workspaceFailure}</div>
+      )}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
     </div>

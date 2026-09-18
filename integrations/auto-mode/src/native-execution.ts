@@ -64,10 +64,11 @@ export interface NativeExecution {
 export async function prepareNativeExecution(ctx: Context, exec: ToolExecution, roots: PolicyRoots, signal: AbortSignal): Promise<NativeExecution> {
   const tool = ctx.tools.get(exec.name, exec.agent)
   if (tool === undefined) throw Error('tool-unavailable')
+  const execute = tool.execute
   const args = exec.arguments as Record<string, unknown>
-  if (['glob', 'grep'].includes(exec.name) && ctx.get('fileSearchAccessVersion') !== 1) throw Error('protected-native-search-unavailable')
   const command = exec.name === 'pwsh' || exec.name === 'bash'
   const search = exec.name === 'grep' || exec.name === 'glob'
+  if (search && tool.fileSearchAccessVersion !== 1) throw Error('protected-native-search-unavailable')
   const provider = command ? ctx.get('shell') : ctx.get('fs')
   const subprocess = command || search ? ctx.get('subprocess') : undefined
   if ((command || search) && (subprocess === undefined || Reflect.get(subprocess, 'hostFileAccess') !== true)) throw Error('verified-host-process-provider-unavailable')
@@ -81,7 +82,9 @@ export async function prepareNativeExecution(ctx: Context, exec: ToolExecution, 
   const entries: Array<{ path: string; identity: string }> = []
   const validate = () => {
     signal.throwIfAborted()
-    if (ctx.tools.get(exec.name, exec.agent)?.execute !== tool.execute) throw Error('execution tool provider changed')
+    const currentTool = ctx.tools.get(exec.name, exec.agent)
+    if (currentTool !== tool || currentTool.execute !== execute) throw Error('execution tool provider changed')
+    if (search && currentTool.fileSearchAccessVersion !== 1) throw Error('protected-native-search-unavailable')
     if (original(provider) !== original(command ? ctx.get('shell') : ctx.get('fs'))) throw Error('execution service changed')
     if (command && (original(subprocess) !== original(ctx.get('subprocess')) || original(sandbox) !== original(ctx.get('sandbox')))) throw Error('native execution backend changed')
     if ((command || search) && (original(subprocess) !== original(ctx.get('subprocess')) || Reflect.get(ctx.subprocess, 'hostFileAccess') !== true)) throw Error('native execution world changed')
