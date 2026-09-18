@@ -25,7 +25,7 @@ Mount `dsh-subprocess-local` in any composition that runs child processes on the
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount the provider beside its consumers and start processes exactly as the subprocess service specifies; this package decides only how those processes run on the host. On Windows, non-terminal children and `taskkill` helpers start with their windows hidden so background operations do not take focus. This also hides GUI windows that honor the process startup visibility setting.
+On Windows, ordinary Job runners start hidden and console targets use `CREATE_NO_WINDOW`, including under Electron. Their standard streams remain connected to the caller, and Job cancellation still terminates descendants. ConPTY sessions retain their existing terminal behavior. This does not prevent a command from explicitly launching its own graphical application.
 
 ### Mounting the provider
 

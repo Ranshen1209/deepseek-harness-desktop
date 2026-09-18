@@ -28,6 +28,8 @@ request 被消费或 manager 已观察到 loaded unit 都能建立 scope ownersh
 
 ### Windows runner 与 Job
 
+Windows runner 使用 `windowsHide: true` 启动，其普通控制台目标使用 `CREATE_NO_WINDOW`：仅隐藏 runner 无法阻止控制台程序在 Electron GUI 进程下新建窗口。输出仍通过已配置的载体传递，挂起创建、Job 分配、取消和进程范围清理保持不变。ConPTY 会话继续使用原有终端路径。
+
 Windows parent 从 bootstrap cwd 与环境启动 provider runner，把原始 target argv 放在私有 `--` 分隔符之后，并等待 Node 的 runner `spawn` 事件后才发送恰好一条 start request。runner 在 spawn 前报错时，direct launch failure 会原样保留，同时证明 Job range 从未存在，因此 empty-range wait 成功；spawn 后的 infrastructure failure 仍是不确定状态，会使 range settlement reject。除此之外，Node IPC 还承载幂等 terminate control 与恰好一个 result。runner 的 fd 0 至 fd 2 相互隔离，fd 3 承载 IPC，fd 4 至 fd 6 承载 target stdin、stdout 与 stderr。忽略 stdin 时，fd 4 继承平台 null-device descriptor；其他模式使用 pipe。共享 Win32 层通过 Node 导出的 `uv_get_osfhandle()` 把 fd 4 至 fd 6 映射为 OS handle，拒绝 null 以及 Koffi 暴露的 unsigned `UV_INVALID_OS_FILE_HANDLE` 与 `UV_INVALID_FILE_DESCRIPTOR` sentinel，临时启用有效 handle 的继承，并通过 `STARTF_USESTDHANDLES` 传入。`spawnCurrentTokenJobProcess` 要求单独解析的 `applicationName` 与完整 target 环境，并使用 `CREATE_UNICODE_ENVIRONMENT` 传入排序、双 NUL 结尾的 UTF-16LE 块，其中包括 `=X:` 驱动器条目，而不修改 runner 环境。suspended target 进入 Job 并恢复后，runner 只关闭 fd 4 至 fd 6；它绝不改写或销毁 Node 标准流。parent 把 pipe carrier stream 作为普通句柄的 stdio 返回，用户字节绝不经过 IPC。
 
 runner 是 target process handle 与 unnamed Job handle 的唯一 owner。`spawnCurrentTokenJobProcess` 以 suspended 状态创建 target，把它分配给不允许 active breakaway 的 kill-on-close Job，并只在分配后恢复。runner 轮询 direct process 获取 target exit code，并轮询 Job 获取 active-process count。只有 direct result 已通过 IPC send callback 交付且 Job 已报告零 active process 后，runner 才成功退出；parent 只把这次 clean exit 映射成成功的 `waitForExit()`。

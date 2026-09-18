@@ -1,10 +1,10 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn, spawnSync, type SpawnOptions } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import type { SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
-import { targetEnvironment } from '../src/runner-launch.ts'
+import { spawnRunnerInvocation, targetEnvironment } from '../src/runner-launch.ts'
 import { bindManagedProcess } from '../src/spawn.ts'
 import { launchWindowsJob, probeWindowsJob } from '../src/windows-job.ts'
 
@@ -84,6 +84,34 @@ function directSpawnFailure(argv: readonly string[], cwd = scratch): Promise<Spa
 const windowsNative = process.platform === 'win32' && probeWindowsJob()
 
 describe.skipIf(!windowsNative)('Windows Job native containment', () => {
+  it('runs PowerShell without allocating a console window', async () => {
+    const command = `
+      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ConsoleProbe { [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); }'
+      [ConsoleProbe]::GetConsoleWindow().ToInt64()
+      [Console]::Error.WriteLine('stderr-ok')
+    `
+    const request = spec([
+      join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+      '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command,
+    ])
+    const electron = process.env.DSH_TEST_ELECTRON_EXECUTABLE
+    const handle = bindManagedProcess(request, launchWindowsJob(request, targetEnvironment(request), electron === undefined ? {} : {
+      runnerInvocation: [electron, ...spawnRunnerInvocation().slice(1)],
+      // launchWindowsJob uses only the three-argument spawn overload.
+      spawn: ((program: string, args: readonly string[], options?: SpawnOptions) => spawn(program, args, {
+        ...options, env: { ...options?.env, ELECTRON_RUN_AS_NODE: '1' },
+      })) as unknown as typeof spawn,
+    }))
+    try {
+      await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null })
+      expect(handle.collected.stdout?.readFrom(0).text.trim()).toBe('0')
+      expect(handle.collected.stderr?.readFrom(0).text.trim()).toBe('stderr-ok')
+    } finally {
+      handle.terminate()
+      await handle.waitForExit()
+    }
+  })
+
   it('keeps raw stdin writable while the runner starts the target', async () => {
     const output = join(scratch, `stdin-${Date.now()}.txt`)
     const script = `

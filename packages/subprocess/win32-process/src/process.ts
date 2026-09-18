@@ -541,7 +541,7 @@ export function spawnInheritedJobProcess(
 }
 
 /**
- * Spawn an ordinary process suspended, assign its Job, then resume it.
+ * Spawn an ordinary process without a console, assign its Job, then resume it.
  * @param api - active binding table.
  * @param options - command, cwd, argv, and target carrier descriptors.
  * @returns caller-owned process and Job handles after successful resume.
@@ -559,7 +559,7 @@ export function spawnCurrentTokenJobProcess(
       null,
       null,
       1,
-      abi.CREATE_SUSPENDED | abi.CREATE_UNICODE_ENVIRONMENT,
+      abi.CREATE_SUSPENDED | abi.CREATE_UNICODE_ENVIRONMENT | abi.CREATE_NO_WINDOW,
       environment,
       options.cwd,
       startupInfo,

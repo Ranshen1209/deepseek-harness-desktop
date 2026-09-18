@@ -18,13 +18,16 @@ const preset = process.env.AUTO_FIXTURE_PRESET
 const auto = preset === 'auto'
 const shell = process.platform === 'win32' ? 'pwsh' : 'bash'
 const print = marker => process.platform === 'win32' ? `Write-Output "${marker}"` : `printf '%s\\n' '${marker}'`
+const consoleCheck = process.platform === 'win32' && (auto || preset === 'danger-full-access')
+  ? `; Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class DesktopConsoleProbe { [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); }'; if ([DesktopConsoleProbe]::GetConsoleWindow() -ne [IntPtr]::Zero) { throw 'Unexpected Shell console window' }; Write-Output "OFFICIAL_AUTO_NO_CONSOLE_OK"`
+  : ''
 const commonPlan = [
   { label: 'read', name: 'read', args: { file_path: join(root, 'existing.txt') } },
   { label: 'glob', name: 'glob', args: { pattern: '*.txt', path: root } },
   { label: 'grep', name: 'grep', args: { pattern: 'valuable', path: root } },
   { label: 'edit-approved', name: 'edit', args: { file_path: join(root, 'existing.txt'), old_string: 'valuable', new_string: 'approved' } },
   { label: 'write-approved', name: 'write', args: { file_path: join(root, 'approved.txt'), content: 'approved new file' } },
-  { label: 'ordinary', name: shell, args: { command: print('OFFICIAL_AUTO_SHELL_OK'), description: 'Print an isolated runtime marker', workdir: root } },
+  { label: 'ordinary', name: shell, args: { command: print('OFFICIAL_AUTO_SHELL_OK') + consoleCheck, description: 'Print an isolated runtime marker and check console allocation', workdir: root } },
   { label: 'present', name: 'present', args: { files: [{ path: join(root, 'approved.txt'), description: 'Runtime fixture output' }] } },
 ]
 const denialPlan = ['model-denied', 'model-error', 'model-invalid'].map(label => ({ label, name: 'write', args: { file_path: join(root, label + '.txt'), content: 'must not exist' } }))

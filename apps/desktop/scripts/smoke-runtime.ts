@@ -152,6 +152,9 @@ export function apply(ctx) {
       grepFoundContent: grepValue?.matches?.some(match => match.path === 'existing.txt' && match.line === 'valuable') === true,
       deliverableRecorded: delivery?.files?.some(file => file.path === join(effects, 'approved.txt')) === true,
       nativeCommandOutput: JSON.stringify(resultFor('ordinary')?.value).includes('OFFICIAL_AUTO_SHELL_OK'),
+      ...(process.platform === 'win32' && (preset === 'auto' || preset === 'danger-full-access') ? {
+        noShellConsole: JSON.stringify(resultFor('ordinary')?.value).includes('OFFICIAL_AUTO_NO_CONSOLE_OK'),
+      } : {}),
       ...(auto ? {
         childReviewed: resultFor('child-read')?.child === true && resultFor('child-read')?.preset === 'auto',
         externalRemoved: !existsSync(join(scratch, 'external.txt')),

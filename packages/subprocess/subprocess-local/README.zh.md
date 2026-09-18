@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-把提供方与它的消费方挂载在同一组合中，并完全按子进程服务的规定启动进程；本包只决定这些进程在宿主机上如何运行。在 Windows 上，非终端子进程与 `taskkill` 辅助进程会隐藏窗口，因此后台操作不会抢占焦点。遵循进程启动可见性设置的 GUI 窗口也会被隐藏。
+在 Windows 上，普通 Job runner 隐藏启动，控制台目标使用 `CREATE_NO_WINDOW`，包括 Electron 下的调用。标准流仍连接到调用方，Job 取消仍会终止后代进程。ConPTY 会话保持原有终端行为。这不会阻止命令主动启动自己的图形应用。
 
 ### 挂载提供方
 
