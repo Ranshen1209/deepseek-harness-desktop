@@ -21,7 +21,7 @@ body.failed { overflow: auto; }
 main { padding: 20px 0; }
 #particles { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
 .logo-stage { display: grid; place-items: center; height: 236px; }
-#logo { opacity: 0; object-fit: contain; }
+#logo { opacity: 0; object-fit: contain; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .static #logo { opacity: 1; }
 #spinner { display: none; }
 .failed .logo-stage { display: none; }

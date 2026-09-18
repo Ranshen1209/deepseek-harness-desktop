@@ -9,7 +9,7 @@ import sharp from 'sharp'
 import { resolveDesktopLocale } from '../src/locale.ts'
 import type { DesktopBackendState } from '../src/backend-controller.ts'
 
-const renderer = fileURLToPath(new URL('../renderer/', import.meta.url))
+const renderer = process.env.DSH_DESKTOP_UI_RENDERER ?? fileURLToPath(new URL('../renderer/', import.meta.url))
 const output = process.env.DSH_DESKTOP_UI_ARTIFACTS
 const files = new Set(['startup.html', 'startup.css', 'startup.js', 'startup-particles.js', 'deepseek-mark.svg'])
 const types: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' }
@@ -49,11 +49,30 @@ try {
     assert.equal(await page.locator('#description').textContent(), locale.messages.startupLoadingDescription)
     await page.waitForFunction(() => document.body.classList.contains('assembled'))
     assert.equal(await page.locator('#logo').evaluate(element => getComputedStyle(element).opacity), '0', 'the animated whale must contain particles only')
+    await page.evaluate(() => {
+      document.body.dataset.logoDrags = '0'
+      document.addEventListener('dragstart', (event) => {
+        if (event.target instanceof HTMLImageElement && event.target.id === 'logo') {
+          document.body.dataset.logoDrags = String(Number(document.body.dataset.logoDrags) + 1)
+        }
+      })
+    })
+    const dragLogo = async () => {
+      const box = await page.locator('#logo').boundingBox()
+      assert(box !== null)
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(box.x - 100, box.y + box.height / 2, { steps: 10 })
+      await page.mouse.up()
+      assert.equal(await page.locator('body').getAttribute('data-logo-drags'), '0', 'the decorative logo must not start an image drag')
+    }
+    await dragLogo()
     if (output !== undefined) {
       await mkdir(output, { recursive: true })
       await page.screenshot({ path: join(output, `startup-${language}.png`) })
     }
     await page.emulateMedia({ reducedMotion: 'reduce' })
+    await dragLogo()
     assert.equal(await page.locator('#spinner').evaluate(element => getComputedStyle(element).animationName), 'none')
     assert.equal(await page.evaluate(async () => {
       const canvas = document.querySelector('#particles') as HTMLCanvasElement
@@ -80,7 +99,7 @@ try {
     await page.close()
   }
   const advance = (page: Page, milliseconds: number) => page.evaluate(
-    ms => (globalThis as unknown as { advanceScene: (ms: number) => void }).advanceScene(ms), milliseconds,
+    (ms) => { (globalThis as unknown as { advanceScene: (ms: number) => void }).advanceScene(ms) }, milliseconds,
   )
   const createScene = async (): Promise<Page> => {
     const page = await browser!.newPage({ viewport: { width: 760, height: 540 } })
