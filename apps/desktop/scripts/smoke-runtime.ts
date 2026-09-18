@@ -23,7 +23,7 @@ export async function smokeDesktopRuntime(root: string, node: string, runtime: D
   realReview?: boolean
   model?: string
 } = {}): Promise<void> {
-  for (const preset of ['read-only', 'workspace-write', 'danger-full-access', 'preservation']) {
+  for (const preset of ['read-only', 'workspace-write', 'danger-full-access', 'auto']) {
     await smokeDesktopPreset(root, node, runtime, options, preset)
   }
 }
@@ -81,7 +81,7 @@ export function apply(ctx) {
 - insert:
     - id: desktop-runtime-smoke-plugin
       name: desktop-runtime-smoke-plugin
-    - id: desktop-preservation-fixture
+    - id: desktop-official-auto-fixture
       name: desktop-runtime-smoke-plugin/fixture.mjs
 `)
     const fixtureManifest = JSON.parse(readFileSync(join(plugin, 'package.json'), 'utf8')) as Record<string, unknown>
@@ -112,61 +112,57 @@ export function apply(ctx) {
     }
     const deadline = Date.now() + (options.realReview ? 240_000 : 75_000)
     while (!existsSync(donePath) && Date.now() < deadline) await setTimeout(100)
-    if (!existsSync(donePath)) throw new Error('desktop runtime: preservation fixture did not finish')
+    if (!existsSync(donePath)) throw new Error('desktop runtime: official Auto fixture did not finish')
     const completion = JSON.parse(readFileSync(donePath, 'utf8')) as { completed?: boolean; error?: string }
-    if (!completion.completed) throw new Error(`desktop runtime: preservation fixture failed: ${completion.error}\n${existsSync(tracePath) ? readFileSync(tracePath, 'utf8') : 'no trace'}`)
+    if (!completion.completed) throw new Error(`desktop runtime: official Auto fixture failed: ${completion.error}\n${existsSync(tracePath) ? readFileSync(tracePath, 'utf8') : 'no trace'}`)
     const trace = readFileSync(tracePath, 'utf8').trim().split('\n').map(line => JSON.parse(line)) as Array<Record<string, unknown>>
     const resultFor = (label: string): Record<string, unknown> | undefined => trace.find(event => event.event === 'tool-result' && event.label === label)
     const contents = (file: string): string | undefined => existsSync(join(effects, file)) ? readFileSync(join(effects, file), 'utf8') : undefined
-    const recoveredContents = (label: string): string | undefined => {
-      const file = (resultFor(label)?.value as { recovery_path?: string } | undefined)?.recovery_path
-      return file !== undefined && existsSync(file) ? readFileSync(file, 'utf8') : undefined
+    const auto = preset === 'auto'
+    const expected = {
+      read: false, glob: false, grep: false, 'edit-approved': false, 'write-approved': false, ordinary: false, present: false,
+      ...(preset === 'read-only' ? { 'edit-sandbox-denied': true, 'write-sandbox-denied': true } : {}),
+      ...(auto ? { 'external-write': false, 'external-read': false, 'external-remove': false, delegation: false, 'child-read': false,
+        ...(!options.realReview ? { 'model-denied': true, 'model-error': true, 'model-invalid': true } : {}) } : {}),
     }
-    const auto = preset === 'preservation'
-    const expected = !auto
-      ? { read: false, 'edit-approved': false, 'write-approved': false, ordinary: false,
-        ...(preset === 'read-only' ? { 'edit-sandbox-denied': true, 'write-sandbox-denied': true } : {}) }
-      : options.realReview
-        ? { read: false, 'edit-approved': false, 'write-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'external-read-edited': false, 'external-trash': false, 'goal-read': false, ordinary: false, widening: false, cleanup: true, delegation: true }
-        : { read: false, 'model-denied': true, 'model-error': true, 'model-invalid': true, 'edit-approved': false, 'write-approved': false, 'manual-approved': false, 'trash-approved': false, 'external-approved': false, 'external-read': false, 'external-edit': false, 'external-read-edited': false, 'external-trash': false, 'write-rejected': true, ordinary: false, widening: false, cleanup: true, delegation: true }
     const reviews = trace.filter(event => event.event === 'model-review')
     const session = trace.find(event => event.event === 'fixture-session')
     const manual = trace.filter(event => event.event === 'manual-approval')
     const requests = trace.filter(event => event.event === 'model-request')
+    const results = trace.filter(event => event.event === 'tool-result')
+    const readValue = resultFor('read')?.value as { lines?: Array<{ text: string }> } | undefined
+    const globValue = resultFor('glob')?.value as { paths?: string[] } | undefined
+    const grepValue = resultFor('grep')?.value as { matches?: Array<{ path: string; line: string }> } | undefined
+    const delivery = trace.find(event => event.event === 'deliverables/presented')?.data as { files?: Array<{ path: string }> } | undefined
     const assertions = {
       toolsSettled: Object.entries(expected).every(([label, isError]) => resultFor(label)?.isError === isError),
-      nativeDefault: session?.defaultPreset === 'workspace-write' && trace.filter(event => event.event === 'tool-result').every(event => event.preset === preset),
+      nativeDefault: session?.defaultPreset === 'workspace-write',
+      fourChoices: JSON.stringify(session?.catalog) === JSON.stringify(['read-only', 'workspace-write', 'danger-full-access', 'auto']),
+      noCustomPolicy: session?.customPolicyAbsent === true,
       homeWorkspace: session?.home === effects && session.cwd === effects,
-      approvalPolicy: session?.approval === (preset === 'danger-full-access' ? 'never' : 'ask'),
-      reviewScope: auto ? reviews.length > 0 : reviews.length === 0,
-      nativeToolsVisible: requests.every(event => (event.toolNames as string[]).includes(process.platform === 'win32' ? 'pwsh' : 'bash')),
-      managedToolsOnlyInAuto: requests.every(event => (event.toolNames as string[]).includes('managed_file') === auto),
-      taskModel: reviews.every(event => event.provider === (options.realReview ? 'deepseek-official' : 'auto-mode-fixture') && event.model === (options.realReview ? options.model ?? 'deepseek-flash' : 'deterministic')),
-      ...(auto && options.realReview ? {
-        deepseekMax: reviews.every(event => event.reasoningEffort === 'max' && event.finish === 'stop'),
-        goalReadable: resultFor('goal-read')?.isError === false,
-      } : {}),
+      approvalPolicy: session?.approval === (auto || preset === 'danger-full-access' ? 'never' : 'ask'),
+      reviewScope: auto ? reviews.length === results.length : reviews.length === 0,
+      nativeToolsVisible: requests.every(event => ['read', 'glob', 'grep', 'present', 'subagent', process.platform === 'win32' ? 'pwsh' : 'bash'].every(name => (event.toolNames as string[]).includes(name))),
+      noManagedTools: requests.every(event => !(event.toolNames as string[]).includes('managed_file') && !(event.toolNames as string[]).includes('managed_list')),
+      noCustomGuidance: requests.every(event => event.autoGuidance === false),
       approvedEdit: contents('existing.txt') === 'approved',
       approvedCreate: contents('approved.txt') === 'approved new file',
-      nativeCommandCompleted: resultFor('ordinary')?.isError === false,
+      readContent: readValue?.lines?.some(line => line.text === 'valuable') === true,
+      globFoundFile: globValue?.paths?.includes('existing.txt') === true,
+      grepFoundContent: grepValue?.matches?.some(match => match.path === 'existing.txt' && match.line === 'valuable') === true,
+      deliverableRecorded: delivery?.files?.some(file => file.path === join(effects, 'approved.txt')) === true,
+      nativeCommandOutput: JSON.stringify(resultFor('ordinary')?.value).includes('OFFICIAL_AUTO_SHELL_OK'),
       ...(auto ? {
-        reversibleTrash: contents('trash.txt') === undefined && recoveredContents('trash-approved') === 'recoverable',
-        exactExternalEdit: (resultFor('external-read')?.value as { content: string } | undefined)?.content === 'external approved'
-          && (resultFor('external-read-edited')?.value as { content: string } | undefined)?.content === 'external updated',
-        externalTrash: !existsSync(join(scratch, 'external.txt')) && recoveredContents('external-trash') === 'external updated',
-        rejectedChangesAbsent: ['denied', 'model-denied', 'model-error', 'model-invalid'].every(file => contents(`${file}.txt`) === undefined),
-        deniedCallsNeverPrompt: manual.every(event => !['model-denied', 'model-error', 'model-invalid', 'cleanup', 'delegation'].includes(String(event.label))),
-        widerCallApprovedOnce: manual.filter(event => event.label === 'widening' && event.outcome === 'allowed-once').length === 1 && resultFor('widening')?.isError === false,
-        completeApprovalExplanation: manual.every((event) => {
-          const review = event.review as Record<string, unknown> | undefined
-          return review?.recommendation === 'execute' && ['purpose', 'authorization', 'scope', 'consequences'].every(key => typeof review[key] === 'string' && String(review[key]).trim().length > 0)
-        }),
-      } : { fullAccessDoesNotAsk: preset !== 'danger-full-access' || manual.length === 0 }),
+        childReviewed: resultFor('child-read')?.child === true && resultFor('child-read')?.preset === 'auto',
+        externalRemoved: !existsSync(join(scratch, 'external.txt')),
+        rejectedChangesAbsent: ['model-denied', 'model-error', 'model-invalid'].every(file => contents(`${file}.txt`) === undefined),
+        noManualFallback: manual.length === 0,
+        ...(!options.realReview ? { adapterDefaultReasoning: reviews.every(event => event.reasoningEffort === 'low') } : {}),
+      } : { nativeApprovals: manual.length === (preset === 'read-only' ? 2 : 0) }),
       canaryUnchanged: readFileSync(canary, 'utf8') === 'keep',
-      approvalsAudited: trace.filter(event => event.event === 'approval/asked').length === manual.length && trace.filter(event => event.event === 'approval/decided').length === manual.length,
     }
     if (!Object.values(assertions).every(Boolean)) {
-      throw new Error(`desktop runtime: preservation assertions failed: ${JSON.stringify({ assertions, trace })}`)
+      throw new Error(`desktop runtime: official Auto assertions failed: ${JSON.stringify({ assertions, trace })}`)
     }
     process.stdout.write(`desktop four-permission smoke: ${JSON.stringify({ realApi: options.realReview === true, preset, ...(options.realReview ? { model: options.model ?? 'deepseek-flash', reviews } : {}), assertions })}\n`)
   } finally {

@@ -1,20 +1,17 @@
-/** Host-owned gates remain active across policy unload and replacement. */
+/** Upgrade admission never replaces the official Auto reviewer. */
 import { afterEach, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import ToolRuntime, { defineTool, TOOL_RUNTIME_SCHEDULER } from '@deepseek-ai/dsh-tools'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import { installProtectionGate } from '../../desktop-host/src/protection.ts'
+import { installLegacyPermissionGate } from '../../desktop-host/src/protection.ts'
 
 let ctx: Context | undefined
 async function fixture() {
   ctx = new Context()
-  const events: Array<{ type: string; data: unknown }> = []
-  let mode = 'preservation'
-  const session = { header: { id: 'gate-session' }, get seq() { return events.length }, eventAt: (seq: number) => events[seq] }
-  const agent = { session }
+  let mode = 'workspace-write'
   ctx.provide('permissionPresets', { current: () => mode } as never)
-  installProtectionGate(ctx)
+  installLegacyPermissionGate(ctx)
   await ctx.plugin(SystemPrompt).await()
   await ctx.plugin(ToolRuntime).await()
   let calls = 0
@@ -23,76 +20,28 @@ async function fixture() {
     output: { schema: { type: 'object', additionalProperties: false, properties: {} }, render: () => [] },
     async execute() { calls++; return {} },
   }))
-  let epoch = 0
-  const policy = async () => {
-    const controller = new AbortController()
-    const fork = ctx!.plugin({ name: 'test-protection', apply(scope: Context) {
-      scope.effect(() => () => controller.abort(), 'policy stop')
-      scope.provide('autoModeProtection', { policy: 'preservation-v1', enforceAllSessions: true, modelReview: true, epoch: String(++epoch), signal: controller.signal })
-    } })
-    await fork.await()
-    return fork
-  }
-  const input = { agent: agent as never, name: 'sentinel', arguments: {}, callId: ToolCallId('sentinel-call'), signal: new AbortController().signal }
-  return { ctx, policy, input, setMode(value: string) { mode = value; events.push({ type: 'permission/preset', data: { preset: value } }) }, calls: () => calls, scheduler: ctx.tools[TOOL_RUNTIME_SCHEDULER] }
+  const input = { agent: { session: {} } as never, name: 'sentinel', arguments: {}, callId: ToolCallId('sentinel-call'), signal: new AbortController().signal }
+  return { ctx, input, setMode(value: string) { mode = value }, calls: () => calls, scheduler: ctx.tools[TOOL_RUNTIME_SCHEDULER] }
 }
 afterEach(async () => { await ctx?.fiber.dispose() })
-it('blocks dispatch when the bundled policy is missing', async () => {
-  const f = await fixture()
-  expect((await f.ctx.tools.execute(f.input)).isError).toBe(true)
-  expect(f.calls()).toBe(0)
-})
-it('allows a call while the same policy stays alive', async () => {
-  const f = await fixture(); await f.policy()
-  expect((await f.ctx.tools.execute(f.input)).isError).toBe(false)
-  expect(f.calls()).toBe(1)
-})
-it.each([false, true])('rejects prepared calls after unload, reload=%s', async (reload) => {
-  const f = await fixture(), policy = await f.policy()
-  const prepared = await f.scheduler.prepare(f.input)
-  expect(prepared.kind).toBe('dispatch')
-  await policy.dispose()
-  if (reload) await f.policy()
-  const result = await f.scheduler.dispatch(prepared.exec)
-  expect(result.result.isError).toBe(true)
-  expect(f.calls()).toBe(0)
-})
-it.each([false, true])('cancels calls held by a downstream wrapper, replaced signal=%s', async (replace) => {
-  const f = await fixture(), policy = await f.policy()
-  let enter!: () => void, release!: () => void
-  const entered = new Promise<void>((resolve) => { enter = resolve })
-  const blocked = new Promise<void>((resolve) => { release = resolve })
-  f.ctx.on('tools/execute', async (exec, next) => {
-    const prior = exec.signal
-    if (replace) exec.signal = new AbortController().signal
-    try { enter(); await blocked; return await next() }
-    finally { exec.signal = prior }
-  })
-  const run = f.ctx.tools.execute(f.input)
-  try {
-    await entered
-    await policy.dispose()
-  } finally { release() }
-  expect((await run).isError).toBe(true)
-  expect(f.calls()).toBe(0)
-})
-
-it.each(['read-only', 'workspace-write', 'danger-full-access'])('leaves %s usable with no Auto plugin', async (mode) => {
+it.each(['read-only', 'workspace-write', 'danger-full-access', 'auto'])('does not add a custom Auto policy to %s', async (mode) => {
   const f = await fixture(); f.setMode(mode)
   expect((await f.ctx.tools.execute(f.input)).isError).toBe(false)
   expect(f.calls()).toBe(1)
 })
-it.each([false, true])('revokes a prepared Auto call after a mode switch, switchBack=%s', async (back) => {
-  const f = await fixture(); await f.policy()
-  const prepared = await f.scheduler.prepare(f.input)
-  expect(prepared.kind).toBe('dispatch')
-  f.setMode('danger-full-access'); if (back) f.setMode('preservation')
-  if (prepared.kind !== 'dispatch') throw Error('missing prepared execution')
-  expect((await f.scheduler.dispatch(prepared.exec)).result.isError).toBe(true)
-  expect(f.calls()).toBe(0)
-})
-it('does not execute an inconsistent legacy permission selection', async () => {
-  const f = await fixture(); f.setMode('custom')
+it.each(['custom', 'preservation'])('requires reselection for %s without executing', async (mode) => {
+  const f = await fixture(); f.setMode(mode)
   expect((await f.ctx.tools.execute(f.input)).isError).toBe(true)
+  expect(f.calls()).toBe(0)
+  f.setMode('workspace-write')
+  expect((await f.ctx.tools.execute(f.input)).isError).toBe(false)
+  expect(f.calls()).toBe(1)
+})
+it('checks an inconsistent selection again at dispatch', async () => {
+  const f = await fixture()
+  const prepared = await f.scheduler.prepare(f.input)
+  if (prepared.kind !== 'dispatch') throw Error('missing prepared execution')
+  f.setMode('custom')
+  expect((await f.scheduler.dispatch(prepared.exec)).result.isError).toBe(true)
   expect(f.calls()).toBe(0)
 })

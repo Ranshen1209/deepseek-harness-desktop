@@ -604,6 +604,9 @@ importers:
       '@deepseek-ai/dsh-cmdline':
         specifier: workspace:^
         version: link:../../packages/boot/cmdline
+      '@deepseek-ai/dsh-experimental-auto-review':
+        specifier: workspace:^
+        version: link:../../packages/experimental/auto-review
       '@deepseek-ai/dsh-fs':
         specifier: workspace:^
         version: link:../../packages/fs/fs
@@ -634,9 +637,6 @@ importers:
       '@deepseek-ai/dsh-web-frontend':
         specifier: workspace:^
         version: link:../web
-      '@nanmicoder/dsh-auto-mode':
-        specifier: workspace:*
-        version: link:../../integrations/auto-mode
 
   apps/web:
     devDependencies:

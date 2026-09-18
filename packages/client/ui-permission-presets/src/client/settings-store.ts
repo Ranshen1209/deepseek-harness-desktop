@@ -75,6 +75,9 @@ export function permissionDefaultOf(view: SettingsNamespaceView, schema: Setting
   if (options.length === 0 || !options.some(option => option.id === value)) {
     throw new Error('permission settings schema does not advertise its current preset')
   }
+  if (schema.nodeAtPath(schema.rehydrate(view.schema), ['semanticsVersion']) !== undefined) {
+    return { currentValue: value === 'preservation' ? 'custom' : value, options: options.filter(option => option.id !== 'preservation') }
+  }
   return { currentValue: value, options }
 }
 
@@ -214,7 +217,7 @@ export class PermissionPresetSettingsController {
         state.options = resolved.options
         state.revision = view.revision
         state.migrationPending = semantics !== undefined && raw?.defaultPreset !== undefined
-          && ['workspace-write', 'danger-full-access'].includes(raw.defaultPreset) && raw.semanticsVersion !== semantics.value
+          && (raw.defaultPreset === 'preservation' || (['workspace-write', 'danger-full-access'].includes(raw.defaultPreset) && raw.semanticsVersion !== semantics.value))
       })
     } catch (error) {
       this.fail(error)

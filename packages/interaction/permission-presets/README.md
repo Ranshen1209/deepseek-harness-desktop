@@ -71,7 +71,7 @@ The `permission` settings namespace holds `defaultPreset` for future sessions an
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Desktop deployments can require a semantics acknowledgement for legacy defaults. Inconsistent explicit preset/knob pairs return custom and await reselection; they never silently select a more permissive preset. Native configurations without that deployment marker retain their defaults.
+Desktop deployments can require a semantics acknowledgement for legacy defaults. Inconsistent explicit preset/knob pairs return custom and await reselection; they never silently select a more permissive preset. Native configurations without that deployment marker retain their defaults. Retired preservation defaults and sessions resolve to custom until an explicit native or official Auto selection; their historical events are retained.
 
 The observable behavior is covered in [Use this package](#use-this-package); this section explains the write path, the process catalog, the projection-backed current value, and the optional command.
 
@@ -137,7 +137,7 @@ These limits define what the preset service does not offer. They are current pac
 - **`custom` is derived-only** — callers can switch away from an unmatched knob combination but cannot target or persist a named custom preset through this service.
 - **The configured preset table is fixed for the plugin lifetime** — only the fixed Auto contribution can change the live process catalog without reloading this service.
 - **Auto cannot become a default** — it exists only while its integration effect is live and is intentionally absent from the `permission` settings schema.
-- **Stored defaults must remain in the preset table** — removing the referenced preset makes Permission settings registration fail until the `permission` section in `settings.yaml` is updated or reset.
+- **Stored defaults must remain in the preset table** — removing the referenced preset makes Permission settings registration fail until the `permission` section in `settings.yaml` is updated or reset. The explicit desktop migration accepts retired preservation data only to require reselection; it does not register an executable preset.
 
 <a id="dev-note"></a>
 ### Dev Note

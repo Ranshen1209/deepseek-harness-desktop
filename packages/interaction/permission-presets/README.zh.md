@@ -71,7 +71,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
-桌面部署可要求为旧默认权限确认语义版本。不一致的明确预设与底层参数返回 custom 并等待重选，不静默选择更宽权限；未配置该部署标记的原生组合保持原默认行为。
+桌面部署可要求为旧默认权限确认语义版本。不一致的明确预设与底层参数返回 custom 并等待重选，不静默选择更宽权限；未配置该部署标记的原生组合保持原默认行为。 已停用的 preservation 默认值和会话解析为 custom，直到明确选择原生档位或官方 Auto；历史事件保留。
 
 可观察行为已在[使用本包](#use-this-package)中说明；本节解释写入路径、进程级目录、由投影支持的当前值与可选命令。
 
@@ -137,7 +137,7 @@ kind: "package-reference"
 - **`custom` 只能推导得出**：调用方可以从不匹配的旋钮组合切换出去，但无法通过此服务选中或持久化一个名为 custom 的预设。
 - **配置预设表在插件生命周期内固定**：只有固定的 Auto contribution 可以在不重新加载本服务的情况下改变实时进程目录。
 - **Auto 不能成为默认值**：它只在 integration effect 存活期间存在，并且有意不进入 `permission` 设置 schema。
-- **已存储的默认值必须保留在 preset 表中**：移除被引用的 preset 会导致权限设置注册失败，直到更新或重置 `settings.yaml` 中的 `permission` 分节。
+- **已存储的默认值必须保留在 preset 表中**：移除被引用的 preset 会导致权限设置注册失败，直到更新或重置 `settings.yaml` 中的 `permission` 分节。 显式桌面迁移仅为要求重新选择而接收已停用的 preservation 数据，不注册可执行预设。
 
 <a id="dev-note"></a>
 ### 开发备注

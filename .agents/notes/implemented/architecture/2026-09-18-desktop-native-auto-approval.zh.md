@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-09-18-desktop-native-auto-approval.md) | 中文
 
+以下自研 Auto 决策由[桌面采用官方 Auto review](2026-09-18-desktop-official-auto.zh.md)替代；工作区和通知决策继续适用。
+
 ## Problem
 
 全局 Auto 拦截重命名了原生选项却没有恢复行为，并因不存在独立执行器而在看似有用的批准后整类封禁命令。Agent 因而可能写入成功却无法验证。人工批准与实际执行需要共享同次调用的授权归属。

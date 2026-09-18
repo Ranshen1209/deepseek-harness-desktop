@@ -235,7 +235,8 @@ export class PermissionPresetService extends TypertRemoteService {
       return label === undefined ? choice : choice.description(label)
     })
     const settingsSchema: z<PermissionSettings> = z.object({
-      defaultPreset: z.union(presetChoices).required(),
+      // Read retired saved settings without advertising an executable preset.
+      defaultPreset: z.union([...presetChoices, ...(config.defaultSemanticsVersion !== undefined && this.presets['preservation'] === undefined ? [z.const('preservation')] : [])]).required(),
       ...(config.defaultSemanticsVersion === undefined ? {} : { semanticsVersion: z.const(config.defaultSemanticsVersion) }),
     })
     ctx.inject(['settings'], (settingsCtx) => {
@@ -337,6 +338,7 @@ export class PermissionPresetService extends TypertRemoteService {
    */
   get defaultPreset(): string {
     const raw = this.ctx.get('settings')?.describe().find(view => view.ns === PERMISSION_SETTINGS_NAMESPACE)?.user as PermissionSettings | undefined
+    if (this.semanticsVersion !== undefined && raw?.defaultPreset === 'preservation' && this.specOf('preservation') === undefined) return CUSTOM_PRESET
     if (this.semanticsVersion !== undefined && raw?.defaultPreset !== undefined
       && ['workspace-write', 'danger-full-access'].includes(raw.defaultPreset) && raw.semanticsVersion !== this.semanticsVersion) return CUSTOM_PRESET
     return this.defaultSettings().defaultPreset
@@ -363,6 +365,8 @@ export class PermissionPresetService extends TypertRemoteService {
   /** Resolve the preset for one folded knob state (the shared mathematics of `current` and the projection unit). */
   private derive(state: KnobState): string {
     if (state.preset === CUSTOM_PRESET) return CUSTOM_PRESET
+    // Retired desktop Auto sessions require a choice before native execution can resume.
+    if (this.semanticsVersion !== undefined && state.preset === 'preservation' && this.specOf('preservation') === undefined) return CUSTOM_PRESET
     const sandbox = state.sandbox ?? this.ctx.shell.sandboxMode
     const approval = state.approval ?? this.ctx.approval.config.policy ?? 'ask'
     const matches = (spec: PresetSpec): boolean => spec.sandbox === sandbox && spec.approval === approval

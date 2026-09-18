@@ -46,20 +46,10 @@
         description: Full file access without approval prompts.
         sandbox: danger-full-access
         approval: never
-      preservation:
-        name: preservation
-        description: Model review for each call. Commands use the native workspace sandbox; leaving it requires one-time approval. Windows confinement has limited protection.
-        sandbox: workspace-write
-        approval: ask
 
 - insert:
-    - id: desktop-preservation-policy
-      name: '@nanmicoder/dsh-auto-mode'
-      config:
-        presetName: preservation
-        enforceAllSessions: false
-        modelReview: true
-        reviewTimeoutMs: 120000
+    - id: auto-review
+      name: '@deepseek-ai/dsh-experimental-auto-review'
 
     - id: directory-picker-native
       name: '@deepseek-ai/dsh-host-directory-picker-native'

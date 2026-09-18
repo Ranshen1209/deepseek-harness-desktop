@@ -49,6 +49,17 @@ function permissionController(api: object) {
 }
 
 describe('permission settings store', () => {
+  it('reads a retired saved default without offering the retired Auto option', async () => {
+    const legacySchema = { uid: 6, refs: { ...SCHEMA.refs, 3: { type: 'union', list: [1, 2, 5] }, 4: { type: 'const', value: 'native-preservation-v1' }, 5: { type: 'const', value: 'preservation' }, 6: { type: 'object', dict: { defaultPreset: 3, semanticsVersion: 4 } } } }
+    const legacy = { ...view('preservation', 8, legacySchema), user: { defaultPreset: 'preservation', semanticsVersion: 'native-preservation-v1' } }
+    const { controller } = permissionController({
+      describe: () => Promise.resolve(ok({ writable: true, hasDocument: true, namespaces: [legacy] })), mutate: vi.fn(),
+    })
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ status: 'ready', migrationPending: true, currentValue: 'custom', writable: true })
+    expect(controller.store.getSnapshot().options.map(option => option.id)).toEqual(['read-only', 'workspace-write'])
+  })
+
   it('acknowledges a legacy default with one revision-bound write even when reselecting the same value', async () => {
     const schema = { uid: 6, refs: { ...SCHEMA.refs, 4: { type: 'const', value: 'native-preservation-v1' }, 6: { type: 'object', dict: { defaultPreset: 3, semanticsVersion: 4 } } } }
     const legacy = { ...view('workspace-write', 8, schema), user: { defaultPreset: 'workspace-write' } }

@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-09-18-desktop-native-auto-approval.zh.md)
 
+The custom Auto decision below is superseded by [Desktop adopts official Auto review](2026-09-18-desktop-official-auto.md); workspace and notification decisions remain applicable.
+
 ## Problem
 
 Global Auto interception renamed native choices without restoring their behavior, and a missing independent executor blocked entire command classes after apparently useful approvals. The resulting Agent could write a file yet fail every verification path. Human approval and execution need one owner for the exact call.

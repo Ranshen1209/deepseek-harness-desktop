@@ -512,3 +512,33 @@ describe('new-session default', () => {
     expect(ctx.permissionPresets.defaultPreset).toBe('workspace-write')
   })
 })
+
+it('requires explicit reselection of a retired saved default', async () => {
+  const ctx = await mountedStore({ config: { defaultSemanticsVersion: 'native-preservation-v1' }, saved: { defaultPreset: 'preservation', semanticsVersion: 'native-preservation-v1' } })
+  try {
+    expect(ctx.permissionPresets.defaultPreset).toBe(CUSTOM_PRESET)
+    const session = ctx.sessions.create(SessionId('retired-default'))
+    expect(ctx.permissionPresets.current(session)).toBe(CUSTOM_PRESET)
+    expect(session.snapshotEvents().slice(-2).map(event => event.data)).toEqual([{ mode: 'read-only' }, { policy: 'ask' }])
+    await ctx.settings.update(PERMISSION_SETTINGS_NAMESPACE, { defaultPreset: 'workspace-write', semanticsVersion: 'native-preservation-v1' })
+    expect(ctx.permissionPresets.defaultPreset).toBe('workspace-write')
+  } finally { await ctx.fiber.dispose() }
+})
+
+it.each(['workspace-write', 'danger-full-access'] as const)('retires saved preservation without executing as %s', async (mode) => {
+  const ctx = await mounted({ config: { defaultSemanticsVersion: 'native-preservation-v1' } })
+  try {
+    const source = freshSession('retired-auto-source')
+    source.append('permission/preset', { preset: 'preservation' })
+    source.append('sandbox/mode', { mode })
+    source.append('approval/policy', { policy: mode === 'workspace-write' ? 'ask' : 'never' })
+    const resumed = ctx.sessions.create(SessionId('retired-auto-resumed'), { seed: source.snapshotEvents() })
+    expect(ctx.permissionPresets.current(resumed)).toBe(CUSTOM_PRESET)
+    expect(resumed.snapshotEvents().filter(event => event.type === 'permission/preset')).toHaveLength(1)
+    await mountAuto(ctx)
+    expect(ctx.permissionPresets.names).toEqual(['workspace-write', 'danger-full-access', 'auto'])
+    ctx.permissionPresets.set(resumed, AUTO_PRESET)
+    expect(ctx.permissionPresets.current(resumed)).toBe(AUTO_PRESET)
+    expect(ctx.permissionPresets.resolve(AUTO_PRESET)).toEqual({ sandbox: 'danger-full-access', approval: 'never' })
+  } finally { await ctx.fiber.dispose() }
+})

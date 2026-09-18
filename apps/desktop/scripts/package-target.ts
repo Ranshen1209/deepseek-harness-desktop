@@ -297,7 +297,6 @@ async function main(): Promise<void> {
     '--pack-destination',
     buildPaths.packedDsh,
   ], buildEnv, REPOSITORY_ROOT)
-  await runPnpm(['--dir', 'integrations/auto-mode', 'pack', '--pack-destination', buildPaths.packedDsh], buildEnv, REPOSITORY_ROOT)
   await runPnpm(['run', 'release:pack', '--family', 'vendor', '--out', buildPaths.packedVendor], buildEnv, REPOSITORY_ROOT)
   rmSync(buildPaths.packedLandlock, { recursive: true, force: true })
   mkdirSync(buildPaths.packedLandlock, { recursive: true })

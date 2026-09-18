@@ -7,7 +7,7 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The private desktop composition labels its required preservation preset as “Preservation” and localizes it with the standard picker. Saved legacy selections remain subject to the desktop host policy.
+The desktop composition enables the official experimental Auto review. Its transition from the retired preservation policy is documented in the [desktop reference](../../../apps/desktop/README.md#permissions-and-auto).
 
 
 ## Summary
@@ -48,7 +48,7 @@ The row derives its options from the host's dynamic `defaultPreset` enum, uses t
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Desktop presents the native three choices plus preservation Auto. A legacy default acknowledgement writes the preset and semantics marker atomically with its settings revision, including when the user reselects the same value. Full access retains its risk confirmation.
+Desktop presents the native three choices plus official Auto. A retired preservation default remains readable, is omitted from selectable defaults, and displays a reselection prompt. A legacy acknowledgement writes the preset and semantics marker atomically with its settings revision. Full access retains its risk confirmation.
 
 The General row reads the explicitly exposed `permission` Settings descriptor through `ctx.settingsScope` and writes one `settings.mutate` path operation with the descriptor revision; its observable rides the slot system's `hooks` compartment, so the renderer owns React hook binding, and a push invalidation refetches the descriptor. The value is read only when a later session is created. The current-session surface is a popupSelect decoration hung on the host `/permission` command (`ctx.commandUi.decorate`): the host command keeps its slash-menu row, argument-bearing form, and durable lifecycle logging, while the decoration replaces only the bare invocation with the picker. One process-scoped directory subscribes to the payload-free catalog notification before its first Remote read and publishes only the latest complete success for the active connection generation. A winning failure or connection reset clears the old snapshot, which hides the composer seat until a later existing trigger retries, while the slash picker stays available and shows the failure with its retry; stale-generation and disposed settlements are ignored. Its public observables are `{ value }` and `invalidations`, one tick per catalog notification or connection-generation change; failures remain internal to imperative loading. Both the slash popup and composer seat consume that shared catalog, while the Session `permissions` projection supplies only `currentValue`. Full access and Auto review each carry localized confirmation copy; Auto also carries the badge rendered by the shared popup shell.
 

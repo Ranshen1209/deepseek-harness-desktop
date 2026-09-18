@@ -5,6 +5,7 @@ export const PERMISSION_ACCESS_NS = 'permission.access'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'selection.required': '请选择权限',
   'migration.required': '旧默认值曾由 Auto 接管。请重新选择并确认默认权限；确认前新会话需要单独选择权限。',
   'preset.preservation': '自动审批（Auto）',
   'title': '权限',
@@ -26,6 +27,7 @@ export type PermissionSettingsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'selection.required': 'Select permissions',
   'migration.required': 'Auto previously controlled this saved default. Reselect and confirm its meaning; until then, new sessions require an explicit permission selection.',
   'preset.preservation': 'Automatic approval (Auto)',
   'title': 'Permission',
@@ -44,7 +46,7 @@ export const en = {
 
 /** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
-  'migration.required': '旧会话的权限标识与执行设置不一致。请重新选择一档权限后继续；现有记录不会被改写。',
+  'migration.required': '旧 Auto 已停用，或保存的权限设置不一致。请重新选择一档权限后继续；历史记录保留。',
   'preservation.description': '逐次模型审核；命令使用原生工作区沙箱，退出沙箱需允许一次。Windows 沙箱仅提供有限保护。',
   'preset.preservation': '自动审批（Auto）',
   'mode': '访问模式，当前：{name}',
@@ -71,7 +73,7 @@ export type PermissionAccessKey = keyof typeof accessZh
 
 /** English dictionary for the current-session popup gate. */
 export const accessEn = {
-  'migration.required': 'Saved permission labels and execution settings disagree. Select a permission mode to continue; existing history is retained.',
+  'migration.required': 'The previous Auto is retired, or saved permissions disagree. Select a permission mode to continue; history is retained.',
   'preservation.description': 'Per-call model review with the native workspace sandbox. Leaving it requires one-time approval. Windows confinement provides limited protection.',
   'preset.preservation': 'Automatic approval (Auto)',
   'mode': 'Access mode, current: {name}',

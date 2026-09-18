@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { installApprovalNotices } from './approval-notices.ts'
-import { installProtectionGate } from './protection.ts'
+import { installLegacyPermissionGate } from './protection.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import {
@@ -313,7 +313,7 @@ export async function runDesktopHost(
   let current: Context | undefined
   const ctx = await boot('dsh desktop', rootConfig, structuredClone(composition.patches), async (hostCtx) => {
     current = hostCtx
-    installProtectionGate(hostCtx)
+    installLegacyPermissionGate(hostCtx)
     installApprovalNotices(hostCtx, writeResponse)
     hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
     await hostCtx.plugin(PluginPackages, { generation: resolution })

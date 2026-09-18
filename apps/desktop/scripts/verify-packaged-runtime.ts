@@ -1,4 +1,4 @@
-/** Exercise the final application executable, its ASAR resources and preservation policy. */
+/** Exercise the final application executable, its ASAR resources and official Auto integration. */
 import { execFile } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
