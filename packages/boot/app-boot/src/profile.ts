@@ -113,6 +113,8 @@ export interface ProfileResolutionGeneration {
   readonly profileDir: string | undefined
   /** Profile-declared packages already installed before the fallback position. */
   readonly localPackageNames: readonly string[]
+  /** Host-owned installation packages that the active profile cannot override locally. */
+  readonly lockedPackageNames?: readonly string[]
   /** Installation entries followed by bundle-only entries in precedence order. */
   readonly entries: readonly ProfileResolutionEntry[]
 }

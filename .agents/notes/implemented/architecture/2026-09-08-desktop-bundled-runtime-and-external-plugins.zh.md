@@ -26,7 +26,7 @@ Desktop 尚未发布。这是它的第一种安装格式；不提供未发布 se
 
 包专用排除项包括 Domino 测试、fs-ext 编译产物、Koffi 的 Windows 导入库，以及非目标平台的 node-pty 预构建文件和调试符号。规则保留原生可执行依赖、node-pty 的 ConPTY 源分发内容、许可证和未知资源；宽泛排除 `src`、`test`、`.ts` 或 `.map` 可能移除可执行代码或运行时数据。复制测试保留哨兵资源并封存过滤后的清单；内置 Node 的[产物 smoke](../../../../apps/desktop/tests/fixtures/runtime-payload-smoke.mjs)验证 PTY 输出、原生文件定位、FFI、图像转换和 HTML 解析。运行时准备仍会验证每个保留字节，并携带外部插件启动完整 Host。
 
-dsh 与私有 Host 生产闭包中的每个第一方包都共享。profile 包含指向这些资源包的目录软链接，在 Windows 上使用 junction。正常 Node 解析会把链接解析到实际宿主包目录。因此，宿主与插件对每个已解析导出的导入共享同一模块实例。不同的 ESM 与 CommonJS 条件导出仍是不同入口；链接不能合并包的两套实现。
+dsh 与私有 Host 生产闭包中的每个第一方包都共享。打包 Desktop 核对共享清单与安装解析表，并向 profile resolver 提供 `lockedPackageNames`。这些名称优先解析到当前运行时，而不是 profile 局部副本、嵌套副本或自引用；ESM、CommonJS、客户端元数据和自有 Worker generation 共用此规则。旧安装器曾在 profile 中留下实体核心包，因此仅记录新运行时标识不能确认执行的代码来源。这些文件保持原样，不能覆盖清单内的包。开发 profile 仍可使用目录链接。不同的 ESM 与 CommonJS 条件导出仍是不同入口。
 
 外部插件把共享宿主包声明为 peer。普通依赖由插件拥有，可以不同于 dsh 使用的版本。验证拒绝已启用插件的不兼容 peer、共享包的嵌套或别名副本、私有包链接，以及通过 CLI 或其他祖先目录解析依赖。如果第三方包需要宿主范围的实例身份，必须明确加入运行时共享清单；版本号相同并不足够。
 

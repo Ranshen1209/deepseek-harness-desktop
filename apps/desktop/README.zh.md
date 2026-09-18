@@ -35,6 +35,8 @@
 
 最终包冒烟命令为 `node --import tsx/esm apps/desktop/scripts/verify-packaged-runtime.ts win-x64`。它使用确定性的主任务和审核响应以及真实打包工具检查装配和执行，不代表模型自主规划或 GUI 按钮通过。可选 verify-autonomous-runtime.ts 运行器要求 DSH_ACCEPTANCE_DISPOSABLE_VM=1、新的临时目录，以及进程环境中的官方 Key。其结构化写入观察不能认证任意命令内部的文件操作闭环。Windows 通知投递、真实用户升级和真实模型自主规划需要单独用户验收。
 
+渲染器验收命令为 `node --import tsx/esm apps/desktop/scripts/verify-packaged-client.ts <packaged-executable> <evidence-directory>`。它用隔离的全新及旧核心包 Profile 启动真实 Electron 应用，等待完整客户端界面，再调用终端 RPC。旧核心文件保留在磁盘上，Host 与浏览器代码均由当前随包模块提供。该检查不调用模型，也不认证操作系统安装器的升级过程。
+
 ## 安装归属
 
 Electron 拥有 `$DSH_HOME/profiles/desktop`。其 `dependencies` 只包含已安装外部插件的精确版本；`dsh.profile.bundles` 包含内置 bundle，后接已启用插件。签名应用从 `resources/dsh` 提供 dsh、私有 Desktop Host 及其生产依赖。共享包链接解析到这些实际目录。宿主与插件在同一个内置上游 Node 进程中执行，使用正常的 realpath 解析；Desktop 不启用 `--preserve-symlinks`。CLI 不能启动或修改此 profile。

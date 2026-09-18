@@ -12,6 +12,7 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { installApprovalNotices } from './approval-notices.ts'
 import { installLegacyPermissionGate } from './protection.ts'
+import { lockDesktopRuntimePackages } from './runtime-resolution.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import {
@@ -306,10 +307,10 @@ export async function runDesktopHost(
   writeFileSync(rootConfig, ROOT_CONFIG)
   const environment = loadLayeredEnv('dsh desktop')
   const composition = desktopComposition(absoluteRuntime, absoluteProject, options.allowLinkedPackages === true)
-  const resolution = await createProfileResolutionGeneration({
+  const resolution = lockDesktopRuntimePackages(absoluteRuntime, await createProfileResolutionGeneration({
     installAnchor: composition.installAnchor,
     profile: composition.profile,
-  })
+  }))
   let current: Context | undefined
   const ctx = await boot('dsh desktop', rootConfig, structuredClone(composition.patches), async (hostCtx) => {
     current = hostCtx

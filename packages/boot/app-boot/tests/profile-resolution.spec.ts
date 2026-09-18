@@ -14,7 +14,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { getEnvironmentData } from 'node:worker_threads'
+import { getEnvironmentData, Worker } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   installProfileResolution,
@@ -175,6 +175,65 @@ async function generationOf(f: ReturnType<typeof fixture>): Promise<ProfileResol
 }
 
 describe('profile resolution generation', { concurrent: false }, () => {
+  it.each(['directory', 'link'] as const)('locks host packages across %s copies, nested copies and self references', async (kind) => {
+    const f = fixture()
+    const local = join(f.profile.dir, 'node_modules', 'resolution-lib')
+    if (kind === 'directory') pkg(local, 'resolution-lib', 9)
+    else {
+      const old = join(f.root, 'old-install')
+      pkg(old, 'resolution-lib', 9)
+      mkdirSync(join(local, '..'), { recursive: true })
+      symlinkSync(old, local, process.platform === 'win32' ? 'junction' : 'dir')
+    }
+    const nested = join(f.profile.dir, 'node_modules', 'external-plugin')
+    pkg(nested, 'external-plugin', 7)
+    pkg(join(nested, 'node_modules', 'resolution-lib'), 'resolution-lib', 8)
+    pkg(join(nested, 'node_modules', 'private-lib'), 'private-lib', 6)
+    const generation = { ...await generationOf(f), localPackageNames: ['resolution-lib'], lockedPackageNames: ['resolution-lib'] }
+    const registration = installProfileResolution(generation)
+    registrations.push(registration)
+    for (const dir of [f.profile.dir, local, nested]) {
+      const require = createRequire(join(dir, 'entry.cjs'))
+      expect(require('resolution-lib')).toEqual({ marker: 1 })
+      const parent = pathToFileURL(join(dir, 'entry.mjs')).href
+      expect(await importFrom('resolution-lib', parent)).toMatchObject({ marker: 1 })
+      expect(resolveFrom('resolution-lib', parent)).toBe(pathToFileURL(join(f.installed, 'index.js')).href)
+      expect(registration.packageDir('resolution-lib', parent)).toBe(f.installed)
+    }
+    expect(createRequire(join(nested, 'entry.cjs'))('private-lib')).toEqual({ marker: 6 })
+    expect(() => { registration.replace({ ...generation, lockedPackageNames: [] }) }).toThrow('changing locked packages')
+    expect(() => { registration.replace({ ...generation, lockedPackageNames: ['resolution-lib', 'missing'] }) }).toThrow('changing locked packages')
+    if (kind === 'link') unlinkSync(local)
+  })
+
+  it('rejects a lock without an installation entry before changing the resolver', async () => {
+    const f = fixture()
+    const generation = await generationOf(f)
+    expect(() => installProfileResolution({ ...generation, lockedPackageNames: ['missing'] })).toThrow('has no installation entry')
+  })
+
+  it('keeps explicit CommonJS paths and self references on the locked installation for active profile callers', async () => {
+    const f = fixture()
+    const local = join(f.profile.dir, 'node_modules', 'resolution-lib')
+    pkg(local, 'resolution-lib', 9)
+    const outside = join(f.root, 'outside')
+    pkg(join(outside, 'node_modules', 'resolution-lib'), 'resolution-lib', 8)
+    pkg(join(outside, 'node_modules', 'private-lib'), 'private-lib', 7)
+    const generation = { ...await generationOf(f), lockedPackageNames: ['resolution-lib'] }
+    registrations.push(installProfileResolution(generation))
+    for (const dir of [f.profile.dir, local]) {
+      const require = createRequire(join(dir, 'entry.cjs'))
+      for (const paths of [[f.profile.dir], [outside], [outside, f.profile.dir], []]) {
+        const resolved = require.resolve('resolution-lib', { paths })
+        expect(resolved).toBe(join(f.installed, 'index.cjs'))
+        expect(require(resolved)).toEqual({ marker: 1 })
+      }
+      expect(require(require.resolve('private-lib', { paths: [outside] }))).toEqual({ marker: 7 })
+    }
+    const requireOutside = createRequire(join(outside, 'entry.cjs'))
+    expect(requireOutside(requireOutside.resolve('resolution-lib', { paths: [outside] }))).toEqual({ marker: 8 })
+  })
+
   it('computes the old fallback graph without materializing it', async () => {
     const f = fixture()
     const generation = await generationOf(f)
@@ -1495,7 +1554,7 @@ describe('profile resolution generation', { concurrent: false }, () => {
 
   it('publishes and restores the generation inherited by owned Workers', async () => {
     const f = fixture()
-    const generation = await generationOf(f)
+    const generation = { ...await generationOf(f), lockedPackageNames: ['resolution-lib'] }
     const key = '@deepseek-ai/dsh-app-boot/profile-resolution'
     const previous = getEnvironmentData(key)
     const dispose = registerWorkerResolution(generation, 'verify')
@@ -1505,6 +1564,41 @@ describe('profile resolution generation', { concurrent: false }, () => {
       dispose()
     }
     expect(getEnvironmentData(key)).toBe(previous)
+  })
+
+  it('uses inherited host locks for real Worker imports and CommonJS resolution', async () => {
+    const f = fixture()
+    pkg(join(f.profile.dir, 'node_modules', 'resolution-lib'), 'resolution-lib', 9)
+    pkg(join(f.profile.dir, 'node_modules', 'private-lib'), 'private-lib', 7)
+    const generation = { ...await generationOf(f), lockedPackageNames: ['resolution-lib'] }
+    const dispose = registerWorkerResolution(generation)
+    const entry = join(f.profile.dir, 'worker.mjs')
+    file(entry, `
+      import { parentPort } from 'node:worker_threads'
+      import { createRequire } from 'node:module'
+      await import(${JSON.stringify(new URL('../src/profile-resolution/worker-bootstrap.ts', import.meta.url).href)})
+      const require = createRequire(import.meta.url)
+      const esm = await import('resolution-lib')
+      parentPort.postMessage({
+        esm: esm.marker,
+        cjs: require('resolution-lib').marker,
+        resolved: require.resolve('resolution-lib', { paths: [] }),
+        private: require('private-lib').marker,
+      })
+    `)
+    let worker: Worker | undefined
+    try {
+      worker = new Worker(pathToFileURL(entry), { execArgv: ['--import', import.meta.resolve('tsx/esm')] })
+      const result = await new Promise<unknown>((resolve, reject) => {
+        worker!.once('message', resolve)
+        worker!.once('error', reject)
+        worker!.once('exit', (code) => { reject(new Error(`Worker exited before its result: ${String(code)}`)) })
+      })
+      expect(result).toEqual({ esm: 1, cjs: 1, resolved: join(f.installed, 'index.cjs'), private: 7 })
+    } finally {
+      await worker?.terminate()
+      dispose()
+    }
   })
 
   it('restores CommonJS resolution when the registration is disposed', async () => {

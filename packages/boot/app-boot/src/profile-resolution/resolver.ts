@@ -79,6 +79,7 @@ interface CompiledGeneration {
   readonly profile: readonly string[]
   readonly activeProfileUrls: readonly string[]
   readonly localPackageNames: ReadonlySet<string>
+  readonly lockedPackageNames: ReadonlySet<string>
   readonly shared: ReadonlySet<string>
   readonly esmRoutes: ResolutionRoutes
   readonly cjsRoutes: ResolutionRoutes
@@ -137,6 +138,11 @@ function prefixes(path: string): readonly string[] {
 }
 
 function compileGeneration(generation: ProfileResolutionGeneration): CompiledGeneration {
+  for (const name of generation.lockedPackageNames ?? []) {
+    if (!generation.entries.some(entry => entry.name === name && entry.scope === 'installation')) {
+      throw new Error(`profile resolution: locked package ${JSON.stringify(name)} has no installation entry`)
+    }
+  }
   const profilePaths = prefixes(generation.profilesDir)
   const profile = generation.profileDir === undefined ? [] : prefixes(generation.profileDir)
   return {
@@ -148,6 +154,7 @@ function compileGeneration(generation: ProfileResolutionGeneration): CompiledGen
     profile,
     activeProfileUrls: profile.map(path => pathToFileURL(path).href),
     localPackageNames: new Set(generation.localPackageNames),
+    lockedPackageNames: new Set(generation.lockedPackageNames),
     shared: new Set(profilePaths.map(prefix => join(prefix, 'node_modules'))),
     esmRoutes: new Map(),
     cjsRoutes: new Map(),
@@ -294,6 +301,11 @@ class ResolutionRouter {
   }
 
   replace(generation: ProfileResolutionGeneration): void {
+    const locked = new Set(generation.lockedPackageNames)
+    if (locked.size !== this.current.lockedPackageNames.size
+      || [...locked].some(name => !this.current.lockedPackageNames.has(name))) {
+      throw new Error('profile resolution: changing locked packages requires a process restart')
+    }
     const entries = new Map(generation.entries.map(entry => [entry.name, entry]))
     if (generation.profilesDir !== this.current.profilesDir
       || generation.profileDir !== this.current.profileDir) {
@@ -334,6 +346,13 @@ class ResolutionRouter {
     const { parent, profilesDir, requests } = parentRoutes
     const name = barePackageName(request)
     if (name === undefined) return undefined
+
+    if (parentRoutes.activeProfile && generation.lockedPackageNames.has(name)) {
+      const entry = generation.entries.get(name) as ProfileResolutionEntry
+      const state = { route: { kind: 'fallback' as const, entry, after: join(dirname(profilesDir), 'package.json') } }
+      requests.set(request, state)
+      return state
+    }
 
     if (parentRoutes.selfReferenceName === undefined) {
       parentRoutes.selfReferenceName = selfReferenceName(parent)
@@ -404,7 +423,8 @@ class ResolutionRouter {
     request: string, parentRoutes: ParentRoutes, generation: CompiledGeneration,
   ): ResolutionRouteState | undefined {
     const name = barePackageName(request)
-    if (name === undefined || !parentRoutes.activeProfile || !generation.localPackageNames.has(name)) return undefined
+    if (name === undefined || !parentRoutes.activeProfile || !generation.localPackageNames.has(name)
+      || generation.lockedPackageNames.has(name)) return undefined
     const state = { route: { kind: 'native' as const } }
     parentRoutes.requests.set(request, state)
     return state
@@ -497,6 +517,12 @@ class ResolutionRouter {
     if (name === undefined) return false
     const self = selfReferenceName(parent)
     return self === name || self === null
+  }
+
+  locksPackage(request: string, parent: string): boolean {
+    const name = barePackageName(request)
+    return name !== undefined && this.current.lockedPackageNames.has(name)
+      && startsWithin(parent, this.current.profile)
   }
 
   packageDir(specifier: string, parentURL: string): string | undefined {
@@ -834,14 +860,15 @@ export function installProfileResolution(
     }
     const parentFilename = parent.filename
     const cacheable = options?.paths === undefined && options?.conditions === undefined
-    const explicitPaths = Array.isArray(options?.paths) ? options.paths : undefined
+    const locked = router.locksPackage(request, parentFilename)
+    const explicitPaths = !locked && Array.isArray(options?.paths) ? options.paths : undefined
     if (explicitPaths !== undefined && router.nativeSelfReference(request, parentFilename)) {
       return originalFilename.call(cjs, request, parent, main, options)
     }
     const explicit = explicitPaths === undefined
       ? undefined
       : router.explicitRoute(request, explicitPaths)
-    if (options?.paths !== undefined && explicit === undefined) {
+    if (!locked && options?.paths !== undefined && explicit === undefined) {
       return originalFilename.call(cjs, request, parent, main, options)
     }
     if (explicit !== undefined && explicitPaths !== undefined && explicit.index > 0) {

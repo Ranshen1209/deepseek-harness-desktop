@@ -31,6 +31,7 @@ jobs:
       - run: pnpm run generate:desktop-icons
       - run: pnpm run package:desktop:win:x64
       - run: pnpm exec tsx apps/desktop/scripts/verify-packaged-runtime.ts win-x64
+      - run: pnpm exec tsx apps/desktop/scripts/verify-packaged-client.ts "apps/desktop/.desktop-build/targets/win-x64/artifacts/win-unpacked/DeepSeek Harness.exe" "apps/desktop/.desktop-build/targets/win-x64/artifacts/client-boot"
       - run: node .github/verify-desktop-version.mjs win-x64
       - uses: actions/upload-artifact@v4
         with:
